@@ -2126,17 +2126,21 @@ svg {
   background: color-mix(in srgb, var(--series-temp) 14%, var(--surface-2));
 }
 
-.team-name {
+/* `p.team-name`/`p.team-org`, not just the class: `.brief p` (class + type)
+   otherwise outranks a bare class selector and both sizes below are ignored
+   -- silently, since 18.5px is a plausible size on its own. */
+p.team-name {
   font-size: 19px;
   font-weight: 600;
   color: var(--ink-1);
 }
 
-.team-org {
-  font-size: 15px;
+p.team-org {
+  font-size: 14px;
   color: var(--ink-3);
   margin-top: 1px;
   overflow-wrap: break-word;
+  white-space: nowrap;
 }
 
 /* ── Live system summary tab ─────────────────────────────────────────────── */
@@ -2748,7 +2752,7 @@ svg {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
   gap: 14px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .arch-does {
@@ -2804,6 +2808,11 @@ svg {
 .flow-rail {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  /* step / title / items / carries-footer -- named as rows (not just a flex
+     column per stage) so every stage's dashed footer line starts at the same
+     shared row, subgridded below, instead of each stage bottom-anchoring its
+     own footer independently and landing at a different height. */
+  grid-template-rows: auto auto auto auto;
   gap: 14px 18px;
   counter-reset: flow;
 }
@@ -2815,9 +2824,10 @@ svg {
   border-top: 5px solid var(--rule);
   border-radius: var(--radius);
   padding: 12px 15px 13px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 4;
+  row-gap: 6px;
 }
 
 /* The connector sits in the 22px column gap. Hidden on the last stage of each
@@ -2897,7 +2907,12 @@ svg {
 /* What leaves the stage, stated as a contract rather than left implicit -- the
    next box down the rail is only allowed to use this. */
 .flow-out {
-  margin-top: auto;
+  /* No longer margin-top: auto -- the dashed line's row is now a shared
+     subgrid track (see .flow-rail), so its top edge (and the dashed border
+     drawn there) already starts at the same height across every stage in
+     the row without needing to be bottom-pushed. Default align-self keeps
+     that top edge pinned to the row's top even when this stage's own text
+     is shorter than the row's shared height. */
   padding-top: 9px;
   border-top: 2px dashed var(--rule);
   font-size: 15px;
@@ -2917,7 +2932,7 @@ svg {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
   gap: 14px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .card[data-branch="alert"] {
@@ -2978,7 +2993,7 @@ svg {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 14px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .flow-facts p,

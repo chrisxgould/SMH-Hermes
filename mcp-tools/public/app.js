@@ -1364,17 +1364,29 @@ const DEMO_TIMELINE = [
 ];
 const DEMO_CYCLE_MS = DEMO_TIMELINE.reduce((sum, phase) => sum + phase.duration, 0);
 
+// `activity` mirrors the real path: the UNO Q's own on-board model watches
+// the same sensor history and pages independently of the threshold check
+// above (src/alert-skill/tick.ts's `UNO Q detected a possible activity: ...`
+// wording, reused verbatim via humanizeActivity so the demo doesn't invent a
+// second phrasing for the same feature). `activityAt` is the fraction of the
+// scenario at which it fires -- earlier than the main outbound alert (0.9),
+// since the board's own inference is the faster, cruder read of the same
+// deviation and should visibly arrive first.
 const DEMO_SCENARIOS = [
   {
     inbound: "Notify me when the Temperature or Humidity deviates from the normal baseline by ±20%.",
     outboundKind: "alert",
     outboundText: ({ temp, hum, devPct }) =>
       `Environmental alert: temperature ${temp.toFixed(1)}°C (+${devPct}% vs baseline), humidity ${hum.toFixed(1)}% (−${devPct}% vs baseline) — exceeds your ±20% threshold.`,
+    activity: "possible_fire",
+    activityAt: 0.5,
   },
   {
     inbound: "Notify me when the door is opened and an object is detected.",
     outboundKind: "alert",
     outboundText: () => "Door opened and an object was detected passing through.",
+    activity: "person_entered_room",
+    activityAt: 0.5,
   },
   {
     inbound:
@@ -1387,7 +1399,7 @@ const DEMO_SCENARIOS = [
 
 let demoTimerId = null;
 let demoCycleStart = 0;
-let demoRun = { cycle: -1, pos: -1, inboundFired: false, outboundFired: false, envBaseline: null };
+let demoRun = { cycle: -1, pos: -1, inboundFired: false, outboundFired: false, activityFired: false, envBaseline: null };
 let demoMessages = [];
 let demoMsgSeq = 0;
 
@@ -1619,19 +1631,25 @@ function demoTick() {
     // can skip straight over the in-window fire below without this.
     if (demoRun.pos >= 0) {
       const leaving = DEMO_TIMELINE[demoRun.pos];
-      if (leaving.type === "scenario" && demoRun.inboundFired && !demoRun.outboundFired) {
+      if (leaving.type === "scenario" && demoRun.inboundFired) {
         const leavingScenario = DEMO_SCENARIOS[leaving.index];
-        pushDemoMessage(
-          "outbound",
-          leavingScenario.outboundKind,
-          leavingScenario.outboundText(demoFinalResult(leaving.index)),
-        );
+        if (leavingScenario.activity && !demoRun.activityFired) {
+          pushDemoMessage("outbound", "alert", `UNO Q detected a possible activity: ${humanizeActivity(leavingScenario.activity)}.`);
+        }
+        if (!demoRun.outboundFired) {
+          pushDemoMessage(
+            "outbound",
+            leavingScenario.outboundKind,
+            leavingScenario.outboundText(demoFinalResult(leaving.index)),
+          );
+        }
       }
     }
     demoRun.cycle = cycle;
     demoRun.pos = phase.pos;
     demoRun.inboundFired = false;
     demoRun.outboundFired = false;
+    demoRun.activityFired = false;
     if (phase.type === "scenario" && phase.index === 0) demoRun.envBaseline = null;
   }
 
@@ -1652,6 +1670,14 @@ function demoTick() {
         : phase.index === 1
           ? demoDoorTick(phase.progress)
           : demoStorageTick(phase.progress);
+
+    // Fires first, ahead of the threshold-based outbound alert below: the
+    // board's own on-device model is a faster, cruder read of the same
+    // deviation, not the authoritative one -- see DEMO_SCENARIOS' comment.
+    if (scenario.activity && phase.progress >= scenario.activityAt && !demoRun.activityFired) {
+      pushDemoMessage("outbound", "alert", `UNO Q detected a possible activity: ${humanizeActivity(scenario.activity)}.`);
+      demoRun.activityFired = true;
+    }
 
     // 0.9, not 1.0: the common-case early fire, so the room has a moment to
     // read the alert before the scenario visibly ends. The transition
@@ -1695,7 +1721,7 @@ function startDemoMode() {
   // negative elapsedTotal for that first stretch and holds a calm resting
   // state instead of launching straight into scenario 1.
   demoCycleStart = Date.now() + DEMO_STARTUP_MS;
-  demoRun = { cycle: -1, pos: -1, inboundFired: false, outboundFired: false, envBaseline: null };
+  demoRun = { cycle: -1, pos: -1, inboundFired: false, outboundFired: false, activityFired: false, envBaseline: null };
   demoMessages = [];
   demoMsgSeq = 0;
   updateDemoUI();
