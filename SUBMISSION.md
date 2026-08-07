@@ -54,9 +54,8 @@ must demo to be eligible for a prize.**
 - [x] **Deployable readiness** — runs from source with a reproducible install path,
   pinned model artifacts (SHA256-verified), health endpoints, and autostart scripts
   (`scripts/install-autostart.ps1`).
-- [ ] **Submit the GitHub link via the Microsoft Form by Friday 12:00 PM PST** — one
-  submission per team. The plan of record ([PROGRESS.md](PROGRESS.md)) says **submit
-  early** — do not wait for the deadline.
+- [x] **Submit the GitHub link via the Microsoft Form by Friday 12:00 PM PST** — done
+  2026-08-07, one submission per team (`https://github.com/aryanil89/SMH-Hermes`).
 - [x] **Every team member submits the feedback form by Friday noon** — all three
   members confirmed submitted (2026-08-06). Mandatory per deck p.7 and p.9.
 
@@ -87,8 +86,9 @@ must demo to be eligible for a prize.**
   pre-enrolled (2026-08-06); `stub` mode stays the default for anyone unenrolled, and live
   volunteer enrolment remains an optional demo beat with consent as a visible act
   ([PROGRESS.md](PROGRESS.md) item 12).
-- [ ] **Benchmark screenshots** — capture list and instructions in
-  [docs/EVIDENCE.md](docs/EVIDENCE.md).
-- [ ] **Venue preflight** — run [docs/RUNBOOK.md §9](docs/RUNBOOK.md#9-venue-preflight--the-pre-demo-checklist)
-  on venue WiFi Friday morning; Telegram needs a live check there (local TLS interception
-  broke it once), hotspot is the fallback.
+- [x] **Benchmark screenshots** — done 2026-08-07; Task Manager NPU graph, HWiNFO power-rail
+  sensors panel, and QAIRT Visualizer op view captured per the list in
+  [docs/EVIDENCE.md](docs/EVIDENCE.md), committed to [docs/evidence/](docs/evidence/).
+- [x] **Venue preflight** — done 2026-08-07 on venue WiFi per
+  [docs/RUNBOOK.md §9](docs/RUNBOOK.md#9-venue-preflight--the-pre-demo-checklist); Telegram
+  checked live at the venue.

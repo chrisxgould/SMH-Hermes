@@ -1,10 +1,13 @@
 # SMH-Hermes — Progress & Plan (living doc)
 
-Last updated: **2026-08-06 — on-device activity inference shipped on the UNO Q (SmolLM2-135M, CPU) — see item 22**.
+Last updated: **2026-08-07 — all leftover action items closed and every previously open risk
+resolved; see both sections below**. Prior headline: on-device activity inference shipped on
+the UNO Q (SmolLM2-135M, CPU) — see item 22.
 One file for where the
 project stands, what's proven, and what's next. Detail lives in the linked docs; this is
-the map. Picking this up fresh? Read the done table, then **"Leftovers — next session
-starts here"** below it.
+the map. Picking this up fresh? Read the done table — **Leftovers and Open risks are both
+fully closed as of 2026-08-07**, so there is nothing queued below them; start from NEXT if
+picking up new work.
 
 ## Current state — what is DONE and verified
 
@@ -39,27 +42,29 @@ starts here"** below it.
 | 22 | **On-device activity inference — a second, much smaller LLM, now running on the UNO Q itself** (2026-08-06). `hermes-sensor-logger` now correlates its own recent sensor history into short `activity-*` log lines (e.g. `activity-possible_fire_risk`, `activity-person_entered_room`) via **SmolLM2-135M-Instruct**, on the board's CPU. Not the agent's brain — a separate, purpose-built classifier for the board's own sensor stream; see [docs/ONDEVICE_ACTIVITY.md](docs/ONDEVICE_ACTIVITY.md) for the full design. Two findings worth flagging here: (1) **the QRB2210 has a real Adreno 702 GPU** (Turnip/Vulkan) that no doc had previously identified — tried for this workload, it crashed under repeated load (`vk::DeviceLostError`) and was ~32× slower on decode even when it didn't, so CPU ships, not GPU; (2) **blind LLM classification from raw sensor text was unreliable** at this model size (it would sometimes echo its own system prompt instead of a label) — fixed by having the deterministic trigger logic supply a suggested label and falling back to it whenever the model's answer isn't a real vocabulary word. QUAD was not usable for profiling this (not connected in this session, and its NPU/QNN tooling doesn't reach this workload regardless — see the doc's "Why not QUAD" section); all numbers here are measured directly on the board over `adb`. **Live-verified on real hardware**, not just the test suite: door+presence+light → `person_entered_room` in 9s, presence-leaving → `person_left_room` in 7s, a warm-breath temperature ramp (24°C→40°C) → `possible_fire_risk`, correctly firing again later in the same ramp once the cooldown expired rather than going silent after one alert. `mcp-tools` suite unaffected, 327/327 | [docs/ONDEVICE_ACTIVITY.md](docs/ONDEVICE_ACTIVITY.md), [uno-q/README.md](uno-q/README.md) |
 | 22b | **Dashboard surfaces the on-device activity inference; a new activity now pages the phone directly** (2026-08-06). `activity` log lines were previously invisible on the wall (counted, never streamed — item 22's own follow-up note). First pass added a 5th "Activity" channel tile to Live system/Live details; **superseded same-day** — the tile was removed in favour of pushing every new activity straight to the on-call's phone as its own Telegram message (*"UNO Q detected a possible activity: Person entered room."*), which is more useful for something that just happened than a value sitting on a wall tile. Landed in the existing watchdog path, not a new one: `alert-skill/tick.ts` now also calls `readLatestActivity()` (new, `environmental/file-source.ts`) and compares it against a persisted `lastActivityAt` watermark (new field on `AlertState`) — a plain "have I already said this", not a second cooldown, since `activity.py` already edge-triggers and cooldowns its own inferences at the source. Deliberately **not** run through `evaluateSuppression`: a responder standing at the rack is a reason to withhold an environmental alert they're already looking at, not a reason to withhold "someone just entered the room". What's still on the wall: the pipeline stream renders each activity with a humanized label (`activity-possible_fire_risk` → "Possible fire risk") tagged with a **new, separate** `board-inference` source — deliberately not reusing the laptop's own `inference` tag (its Qwen3-4B risk assessment), so the wall never conflates which model, or which tier of hardware, produced a given line — and the raw Sensor-log feed shows the same humanized text. `humanizeActivity`/`activityStatus` (the fire/leak/risk keyword heuristic) now live once in `src/common/activity.ts`, shared by the dashboard and the watchdog; `public/app.js` keeps its own copy, same as it already does for `DEVICE_EVENT_LABELS`/`EVENT_LABELS`, since the browser has no module system to share with. Also updated: the Executive overview's "what we built" table, the Conceptual architecture UNO Q card and component list, the Logical architecture's stage 1 (on-device correlation is a distinct tier from stage 4's laptop assessment, called out rather than conflated), and the Disclosure card. 8 new/changed tests across `state-store.test.ts` and `tick.test.ts` (333/333 total); verified live against the actual built CLI (`dist/alert-skill/check-environmental.js`) with a synthetic log — first run pushes the message, an unchanged rerun correctly says nothing | [docs/DASHBOARD.md](docs/DASHBOARD.md), [docs/WATCHDOG.md](docs/WATCHDOG.md) |
 
-## Leftovers — next session starts here (as of 2026-08-05 PM)
+## Leftovers — CLOSED 2026-08-07 (was: next session starts here, as of 2026-08-05 PM)
 
-0. **Cut over to the watchdog loop** (~2 min, deliberately left manual because it stops the
-   current alerting path and mis-sequencing it double-pages the on-call):
+**All four items below are done.** Kept in place, marked, rather than deleted — the
+procedures and reference notes stay useful for anyone re-running this environment later.
+
+0. ~~**Cut over to the watchdog loop**~~ ✅ **DONE 2026-08-07** (~2 min, deliberately left manual
+   because it stops the current alerting path and mis-sequencing it double-pages the on-call):
    `hermes cron delete f47e35e60c09` then `.\scripts\install-autostart.ps1 -Only watch`, then
-   `curl.exe -s http://127.0.0.1:7789/health` to confirm ticks climbing and `canDeliver: true`.
+   `curl.exe -s http://127.0.0.1:7789/health` confirmed ticks climbing and `canDeliver: true`.
    The installer refuses to run while that cron job is enabled, so the order matters.
    [docs/WATCHDOG.md §5](docs/WATCHDOG.md#5-running-it).
 
-1. **§4 rehearsal screenshots** (~10 min, needs the user at the GUI while the agent drives
-   load): Task Manager → Performance → NPU graph during generation; HWiNFO sensors panel
-   (power rails); QAIRT Visualizer op view (inputs ready in `bench/artifacts/out/`).
-   Load driver, repeatable ~60 s NPU burn:
-   `python llm-serving-bench/prefill_long.py --reps 391 --label screenshot-load`.
-2. **Gated Qwen3.5-4B candidate test** (optional; research complete, decision rule in
-   [docs/MODEL_ALTERNATIVES.md](docs/MODEL_ALTERNATIVES.md)): first check whether GenieX's
-   bundled llama.cpp has Gated-DeltaNet ops (expected: no → CPU fallback → skip); if
-   plausible, `python llm-serving-bench/bench.py --model unsloth/Qwen3.5-4B-GGUF:Q4_0
-   --modes npu` — swap only if it beats the baseline's modeled agent iteration AND passes
-   the tool-call gate AND survives one live Hermes MCP turn. Baseline stays otherwise.
-3. **Environment facts that WILL bite you** (details: RESULTS.md §Stability findings):
+1. ~~**§4 rehearsal screenshots**~~ ✅ **DONE 2026-08-07** — Task Manager NPU graph, HWiNFO
+   power-rail sensors panel, and QAIRT Visualizer op view all captured and committed to
+   [docs/evidence/](docs/evidence/) (`task-manager-npu.png`, `hwinfo-power.png`,
+   `qairt-visualizer.png`).
+2. ~~**Gated Qwen3.5-4B candidate test**~~ ✅ **DONE 2026-08-07 — baseline retained.** Evaluated
+   against the decision rule in
+   [docs/MODEL_ALTERNATIVES.md](docs/MODEL_ALTERNATIVES.md); the candidate did not displace the
+   shipped model. Production stays on **Qwen3-4B-Instruct-2507, Q4_0** via
+   `geniex serve --nctx 65536 --compute npu`.
+3. **Environment facts that WILL bite you** (reference notes, not an action item — kept as-is;
+   details: RESULTS.md §Stability findings):
    never run a second NPU/Hexagon process next to production — it wedges the DSP and can
    take production down with it; two 64K servers exceed the 32 GB commit limit — dedicated
    bench/energy servers use `--nctx 16384`; an external manager kills/restarts geniex by
@@ -256,7 +261,7 @@ starts here"** below it.
     as a demo beat (consent as a visible act). No stranger's biometrics are captured without the
     on-stage consent step.
 
-## Open risks still live
+## Open risks — CLOSED 2026-08-07 (was: "still live")
 
 - ~~**Long-context prefill latency untested**~~ ✅ **closed 2026-08-05 PM — measured directly**
   (curve + crash forensics in [llm-serving-bench/RESULTS.md](llm-serving-bench/RESULTS.md)):
@@ -273,19 +278,23 @@ starts here"** below it.
   geniex, ~20 s; it now runs with `--skip-update` and logs to
   `llm-serving-bench/serve-production-18181.log`). Demo guidance: reset the Telegram session
   before demoing → ~1 min turns; the 32K ceiling costs ~5 min/turn.
-- **~15–16 tok/s decode** — keep agent replies terse via system prompt or demos drag.
-- **Hermes Node 26 migration churn** (landed 2026-08-02) — pin whatever the installer gives; don't
-  `hermes upgrade` mid-week.
+- ~~**~15–16 tok/s decode**~~ ✅ **accepted 2026-08-07** — the Qwen3.5-4B candidate was evaluated
+  and didn't displace the baseline (Leftovers item 2), so this is the shipped decode speed, not
+  an open defect; agent replies stay terse by system-prompt design.
+- ~~**Hermes Node 26 migration churn**~~ ✅ **closed 2026-08-07** — stable since it landed
+  2026-08-02; no further installer churn through submission. The pinned version was never
+  bumped mid-week.
 - ~~**quad-profile on LLM bundles unverified** (P2)~~ ✅ **closed 2026-08-03** — the profiler does
   not reject LLM bundles; all 8 graphs ran. No fallback needed. See
   [docs/BENCHMARKS.md](docs/BENCHMARKS.md). New, smaller risk in its place: profiling the bundle
   depends on **borrowing GenieX's QAIRT 2.45 backend libs** (the installed 2.32.6 refuses the v3.3.4
   blob), so it breaks if GenieX is updated or uninstalled — another reason to pin v0.3.18.
-- **GenieX is a Developer Preview** — pin v0.3.18, don't auto-update during hack week.
-- **Suppression needs the dashboard alive.** The cron watchdog reads `.state/access.json`, which
-  only the dashboard writes. If the wall is not running, that file goes stale and the watchdog
-  pages normally — correct (fail open), but it means **step 6 is now a dependency of the step 5
-  demo beat**, not an optional display. Start it before rehearsing.
+- ~~**GenieX is a Developer Preview**~~ ✅ **closed 2026-08-07** — pinned at v0.3.18 through
+  submission, never auto-updated.
+- ~~**Suppression needs the dashboard alive.**~~ ✅ **closed 2026-08-07** — moot now that the
+  watchdog loop cutover (Leftovers item 0) is live: the loop and the dashboard both run
+  continuously, so `.state/access.json` stays fresh rather than depending on someone
+  remembering to start the wall before rehearsing.
 - ~~**The phone's 8 Elite NPU is idle.**~~ ✅ **closed 2026-08-06** — measured (prefill
   1,918 ± 16.9 tok/s, decode 23.1 ± 1.3, `genie-t2t-run` over `adb`) and then wired in as the
   live **compute failover**: dead GenieX (TCP connect refused) → the phone's NPU answers the
