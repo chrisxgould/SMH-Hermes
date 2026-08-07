@@ -297,7 +297,8 @@
                   <tr>
                     <td>Physical access</td>
                     <td>
-                      Presence (ToF, &lt;1000mm) → challenge → photo → automated identity match on
+                      Presence (ToF, &lt;1000mm) → challenge → photo, processed locally by an
+                      on-device model on the phone itself, then automated identity match on
                       CPU (face-cpu) resolves enrolled people. An unmatched face still goes to a
                       human — approve/deny on the phone or this wall — then the audit trail
                     </td>
@@ -307,8 +308,9 @@
                     <td>Phone's role</td>
                     <td>
                       Approval terminal + Telegram client + challenge notification (text only) +
-                      measured on-phone NPU benchmark + failover brain (GenieX down → the phone's
-                      8 Elite answers, labeled degraded — compute failover, not offline)
+                      on-device image processing as part of authentication + measured on-phone
+                      NPU benchmark + failover brain (GenieX down → the phone's 8 Elite answers,
+                      labeled degraded — compute failover, not offline)
                     </td>
                     <td>On-phone serving (persistent endpoint)</td>
                   </tr>
@@ -443,12 +445,14 @@
             </header>
             <p class="arch-does">
               The on-call's notification client, and the one screen a human uses to approve or deny
-              physical access.
+              physical access. It also now runs a local, on-device model of its own to process the
+              captured photo as part of authentication, before the laptop's identity match runs.
             </p>
             <h4 class="sub-head">Components on this device</h4>
             <ul class="arch-components">
               <li><span class="arch-comp-name">Telegram app</span> — pages and reactive questions</li>
               <li><span class="arch-comp-name">phone.html</span> — access terminal: camera, approve/deny</li>
+              <li><span class="arch-comp-name">On-device image-processing model</span> — Hexagon NPU, processes the captured photo locally as part of authentication</li>
             </ul>
             <dl class="kv">
               <dt>Sends to</dt><dd>Laptop, approve/deny decisions</dd>
@@ -582,6 +586,7 @@
             </header>
             <ol class="flow-chain">
               <li>Presence detected → a challenge is issued</li>
+              <li>Photo captured on the phone; a local on-device model there processes it as part of authentication</li>
               <li>Approve/deny on the phone — tailnet, never Telegram</li>
               <li>Every decision is logged to an append-only audit trail</li>
             </ol>
@@ -887,13 +892,15 @@
             <p class="arch-does">
               Runs the Telegram app as the on-call's notification and reactive-question client, and
               opens the laptop-served access terminal page to review and approve/deny physical
-              access — the only surface in the whole system a human writes to. Its own NPU is not
-              in use today.
+              access — the only surface in the whole system a human writes to. Its own Hexagon NPU
+              now also runs a local model that processes the captured photo on-device, as part of
+              authentication, before the laptop's identity match runs.
             </p>
             <h4 class="sub-head">Components on this device</h4>
             <ul class="arch-components">
               <li><span class="arch-comp-name">Telegram app</span> — receives pages, answers reactive questions</li>
               <li><span class="arch-comp-name">phone.html</span> — access terminal: camera capture, approve/deny, served from the laptop</li>
+              <li><span class="arch-comp-name">On-device image-processing model</span> — Hexagon NPU, processes the captured photo locally as part of authentication</li>
             </ul>
             <dl class="kv">
               <dt>Receives</dt><dd>Telegram messages; the terminal page over the tailnet</dd>
@@ -1024,6 +1031,7 @@
               <li><code>identify.ts</code> — detection only, so everyone reads <em>unknown</em></li>
               <li><code>decide.ts</code> → clear · expected · challenge · tailgating…</li>
               <li><code>notify.ts</code> pushes the challenge to the phone (text only)</li>
+              <li>The phone captures a photo and runs a local, on-device model over it as part of authentication</li>
               <li>Approve/deny on <code>phone.html</code> — tailnet, never Telegram</li>
               <li>Append-only audit entry in <code>.state/access.json</code></li>
             </ol>
