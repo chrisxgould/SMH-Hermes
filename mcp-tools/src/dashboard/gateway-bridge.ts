@@ -48,9 +48,9 @@
  *
  * ## Degrading
  *
- * `node:sqlite` is Node 22.5+, and the package only requires Node 20, so the
+ * `node:sqlite` is Node 22.5+, above the package's Node 22 engines floor, so the
  * driver is loaded lazily and a miss is reported as an inbound status rather than
- * thrown. A machine with no Hermes install (a judge who cloned the repo) has no
+ * thrown. A machine with no Hermes install (anyone who cloned the repo) has no
  * database, which is not an error either -- the panel keeps saying "outbound
  * only" exactly as it did before.
  */
@@ -118,7 +118,8 @@ interface SqliteModule {
  *
  * `process.getBuiltinModule` rather than `import("node:sqlite")` for two
  * reasons: a literal import is resolved at compile time and fails to type-check
- * against @types/node 20 (the floor this package supports), and a variable
+ * against the installed @types/node 20 typings (which predate node:sqlite;
+ * the runtime engines floor is Node 22), and a variable
  * specifier is rewritten by the test runner's module transform, which drops the
  * `node:` prefix and then cannot find it. This call reaches the real builtin
  * registry from either environment, and answers `undefined` -- not a throw -- on

@@ -168,7 +168,7 @@ the AI Hub w4a16 Genie bundle; every config difference is tabled in
 ```
 > what should I check first if rack B1 runs hot?
   Got it — the model server is down, so this may take a little longer.   (~2 s, ack, canned)
-  📱 phone-NPU failover — degraded mode, no tools:                        (~15 s)
+  📱 phone-NPU failover — degraded mode, no tools:                        (~12 s)
   In degraded failover mode I cannot read live telemetry, so I cannot
   confirm current temperatures. Check fan operation and airflow first…
 ```
@@ -203,8 +203,18 @@ existing plumbing: Telegram Bot API (HTML, one plain retry on a 400) and the wal
 
 Every answer is prefixed `📱 phone-NPU failover — degraded mode, no tools:` and the system
 prompt forbids invented readings — same fabrication rule the ack hook enforces, because a
-confident fake "rack B1 is fine" from a phone would be worse than silence. Measured warm
-round-trip: **~10 s** (prefill 1,918 tok/s, decode 23.1 tok/s on the phone — RESULTS.md).
+confident fake "rack B1 is fine" from a phone would be worse than silence.
+
+Measured phone leg: **7.1 ± 0.7 s** (n=5, 2026-08-07 — `llm-serving-bench/phone/failover-reps.ps1`).
+The decomposition is worth knowing before anyone tries to make it faster, because the obvious
+lever is the wrong one: **3.83 ± 0.04 s of that is model load, paid on every question**, since
+this is a one-shot `genie-t2t-run` with no resident process on the phone. Decode contributes
+~0.04 s per generated token at 25.8 tok/s, and prefill — the number the phone benchmark makes
+look impressive — is ~0.12 s of the total at these prompt sizes. So the leg is **~4.0 s fixed
++ answer length**; tuning prefill would buy nothing, and only an on-phone serving endpoint
+(explicitly not built) would move the fixed 4 s. End-to-end, message→delivered, adds the ~2 s
+refused-probe detection and Telegram delivery: **12.0 s, n=1**
+([RESULTS.md](../llm-serving-bench/RESULTS.md#the-failover-round-trip-decomposed--n5-2026-08-07)).
 
 Every failure sends an equally labeled, equally honest line instead — *phone not connected /
 unauthorized / bundle missing / genie exited N / timed out* — because silence is exactly what
@@ -235,17 +245,28 @@ All optional — defaults are the demo configuration. Set in `%LOCALAPPDATA%\her
 |---|---|---|
 | `HERMES_FAILOVER` | `1` | `0` disarms without uninstalling |
 | `HERMES_FAILOVER_ADB` | winget scrcpy adb, else `adb` on PATH | |
+| `HERMES_FAILOVER_SERIAL` | auto-detect | pin the phone when several adb devices are attached |
 | `HERMES_FAILOVER_TIMEOUT` | `90` | seconds; past it an honest failure line is sent |
 | `HERMES_FAILOVER_PROBE` | `model.base_url` host:port, else `127.0.0.1:18181` | override rarely |
 
 Phone prerequisites (demo dependencies through Friday): bundle staged at
 `/data/local/tmp/hermes-npu-bench`, USB debugging **on**, Samsung Auto Blocker **off**.
 
+**Two adb devices.** The UNO Q sensor board is an adb target as well as the phone, so
+during the demo two devices are attached and `adb` refuses to guess — it exits 1 with
+*"more than one device/emulator"* on every command. The hook resolves this itself: one
+usable device means no pinning at all, several means it picks the one carrying the genie
+bundle, and a genuine tie fails with both serials named rather than choosing wrong.
+`HERMES_FAILOVER_SERIAL` overrules the whole thing. Entries listed `offline` or
+`unauthorized` are never candidates — a stale `emulator-5554` stub appeared here the
+moment the adb server was restarted, and treating it as a device would have pinned a
+serial that cannot answer.
+
 ### Checking it without killing anything
 
 ```powershell
 $py = "$env:LOCALAPPDATA\hermes\hermes-agent\venv\Scripts\python.exe"
-& $py hermes-hooks\failover\handler.py --selftest              # offline: 41 checks, exit 0/1
+& $py hermes-hooks\failover\handler.py --selftest              # offline: 55 checks, exit 0/1
 & $py hermes-hooks\failover\handler.py --probe                 # one TCP probe: UP=0, DOWN=2
 & $py hermes-hooks\failover\handler.py --try "is rack B1 hot?" # real phone round-trip, print-only
 ```

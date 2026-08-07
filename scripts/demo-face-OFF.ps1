@@ -16,7 +16,7 @@
        not loopback -- this only ever touches a loopback listener owned by a
        'node' process, so tailscaled is never at risk.
     2. Set process-scope env vars for THIS shell only (never setx / User /
-       Machine scope) so the identity method is explicitly 'stub' -- a judge
+       Machine scope) so the identity method is explicitly 'stub' -- anyone
        reading the config should see intent, not an unset fallback -- and the
        face-vision vars are cleared so the child process does not see them.
     3. Relaunch the dashboard, stdout/stderr redirected to the usual logs.
@@ -119,6 +119,9 @@ $env:ACCESS_VISION_TIMEOUT_MS = $null
 $env:ACCESS_MATCH_THRESHOLD   = $null
 if ($Secret -ne '') { $env:ACCESS_SHARED_SECRET = $Secret } else { $env:ACCESS_SHARED_SECRET = $null }
 $env:DASHBOARD_OPEN_BROWSER   = '0'
+# Staleness guard: match the gateway's config.yaml (180s) -- same reasoning as
+# demo-face-ON.ps1: the wall must not call a dead board "real" for an hour.
+$env:UNOQ_LOG_MAX_AGE_S       = '180'
 
 # ── 3. Relaunch ──────────────────────────────────────────────────────────
 Say 'RUN' 'starting dashboard (stub identity)'

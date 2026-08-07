@@ -99,6 +99,17 @@ $env:ACCESS_SHARED_SECRET = "pick-something"
 Then open `…/phone.html?secret=pick-something` on the phone. The server prints a warning at
 startup if you bind to a network without one. It is one lock on one door, not an auth system.
 
+**To get that URL onto a phone** — a new phone, a closed tab, or a bookmark saved without the
+query string — run `scripts\show-phone-link.ps1` on the laptop. It resolves the tailnet
+host, appends the key, copies the link to the clipboard, and verifies the key against the running
+server first.
+
+That verification exists because of a failure that is genuinely hard to diagnose in the moment:
+**a phone holding a key from before the last restart looks fine.** Nothing on the page reads the
+key until a write, so the green `live` dot, the rack verdict and the SSE feed all work — and the
+first sign of trouble is `Capture rejected` after someone has already taken the photo, which
+reads as a broken camera. The script asks the server directly and answers in one line.
+
 **Worked when:** the page shows a green `live` dot, the rack verdict tracks the wall, and
 pressing Approve on a challenge changes the laptop wall within a second.
 
@@ -138,7 +149,7 @@ or the challenge is abandoned — held, not retained.
 Enrolment keeps `{name, embedding, enrolledAt, method}` in `mcp-tools/.state/roster.json` and
 discards the source photo. You cannot reconstruct a face from that file, and it is safe to open
 on stage — "here is our biometric database", followed by a screen of floats, lands better than
-a claim a judge has to take on trust.
+a claim a reviewer has to take on trust.
 
 This is not decoration. GDPR treats facial-recognition templates as **special-category** data
 requiring explicit consent and a privacy impact assessment, and the recognised
@@ -208,9 +219,18 @@ can see the device.
 when a TCP connect to the laptop's GenieX is refused — process dead, not merely busy — a
 gateway hook answers the inbound Telegram question on this phone's NPU instead, one-shot,
 no tools, delivered to Telegram and the wall labeled *📱 phone-NPU failover — degraded
-mode, no tools*. Measured **12.0 s** message→delivered answer (9.3 s of it is the phone).
+mode, no tools*. Measured **12.0 s** message→delivered answer, n=1.
 It is *compute* failover, not an offline mode — Telegram still needs internet. Design,
 limits and the demo arm/disarm scripts: [../hermes-hooks/README.md](../hermes-hooks/README.md).
+
+The **phone leg** of that number is repeatable without killing anything, and was measured at
+**7.1 ± 0.7 s over 5 questions** (`llm-serving-bench/phone/failover-reps.ps1`, raw in
+`failover-reps/`). The decomposition is the interesting part: **3.83 ± 0.04 s of it is model
+load, paid on every single question**, because this path is a one-shot `genie-t2t-run` with
+no resident process — 3.2 GB of context binaries reloaded before the first token. Decode is
+25.8 tok/s, so answer length sets the rest: ~4.0 s fixed + ~0.04 s per generated token. Full
+table and the reason prefill reads 1,100 tok/s here but 1,918 in the bench (prompt length,
+not disagreement): [RESULTS.md § failover round-trip](../llm-serving-bench/RESULTS.md#the-failover-round-trip-decomposed--n5-2026-08-07).
 Demo dependency through Friday: the bundle stays staged at
 `/data/local/tmp/hermes-npu-bench`, USB debugging on, Auto Blocker off.
 
