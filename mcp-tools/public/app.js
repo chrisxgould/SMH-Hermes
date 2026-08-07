@@ -181,6 +181,11 @@ let lastInboundAt = 0;
  */
 let demoMode = false;
 
+/** Which tab is currently active -- the demo badge and conn dot only wear
+ * the amber "demo" look while this is "live"; every other tab reads as
+ * plain live, since demo mode is a Live-system-tab-only presentation. */
+let currentTab = "overview";
+
 /**
  * Whether the newest phone message is actually on screen right now.
  *
@@ -441,21 +446,33 @@ function drawSpark(fig, points, opts) {
 /* ── render: header ──────────────────────────────────────────────────────── */
 
 function renderHeader(snap) {
-  // A dead sensor feed outranks the family rollup: every environmental number
-  // downstream of it is mock, so a green "all clear" would be the single most
-  // misleading thing this page could show.
-  const feedDown = !snap.feed.connected;
-  const worst = feedDown ? "critical" : worstOf([snap.device.status, ...snap.server.families.map((f) => f.status)]);
-  setAttr(els.overallPill, "data-status", worst);
-  els.overallPill.querySelector("use").setAttribute("href", STATUS_ICON[worst] ?? STATUS_ICON.unknown);
-  setText(
-    els.overallPill.querySelector("span"),
-    feedDown
-      ? "Sensor feed down · environmental reading is mock"
-      : worst === "ok"
-        ? "All families within thresholds"
-        : `${worst.toUpperCase()} · see assessment`,
-  );
+  // The detailed rollup (mock/warning/critical) is only meaningful on the two
+  // tabs that actually display live sensor data -- Live system (which may be
+  // showing the scripted demo) and Live details (which never is, see
+  // updateDemoUI). Every other tab is static reference material with nothing
+  // live on screen, so it reads as plain live rather than carrying a real
+  // feed's health with it.
+  if (currentTab !== "live" && currentTab !== "live-details") {
+    setAttr(els.overallPill, "data-status", "ok");
+    els.overallPill.querySelector("use").setAttribute("href", STATUS_ICON.ok);
+    setText(els.overallPill.querySelector("span"), "System live");
+  } else {
+    // A dead sensor feed outranks the family rollup: every environmental number
+    // downstream of it is mock, so a green "all clear" would be the single most
+    // misleading thing this page could show.
+    const feedDown = !snap.feed.connected;
+    const worst = feedDown ? "critical" : worstOf([snap.device.status, ...snap.server.families.map((f) => f.status)]);
+    setAttr(els.overallPill, "data-status", worst);
+    els.overallPill.querySelector("use").setAttribute("href", STATUS_ICON[worst] ?? STATUS_ICON.unknown);
+    setText(
+      els.overallPill.querySelector("span"),
+      feedDown
+        ? "Sensor feed down · environmental reading is mock"
+        : worst === "ok"
+          ? "All families within thresholds"
+          : `${worst.toUpperCase()} · see assessment`,
+    );
+  }
 
   setText(els.brandSub, `${snap.server.model} · ${snap.server.accelerator}`);
   setText(els.headTick, `#${snap.server.tick}`);
@@ -1347,17 +1364,29 @@ const DEMO_TIMELINE = [
 ];
 const DEMO_CYCLE_MS = DEMO_TIMELINE.reduce((sum, phase) => sum + phase.duration, 0);
 
+// `activity` mirrors the real path: the UNO Q's own on-board model watches
+// the same sensor history and pages independently of the threshold check
+// above (src/alert-skill/tick.ts's `UNO Q detected a possible activity: ...`
+// wording, reused verbatim via humanizeActivity so the demo doesn't invent a
+// second phrasing for the same feature). `activityAt` is the fraction of the
+// scenario at which it fires -- earlier than the main outbound alert (0.9),
+// since the board's own inference is the faster, cruder read of the same
+// deviation and should visibly arrive first.
 const DEMO_SCENARIOS = [
   {
     inbound: "Notify me when the Temperature or Humidity deviates from the normal baseline by ±20%.",
     outboundKind: "alert",
     outboundText: ({ temp, hum, devPct }) =>
       `Environmental alert: temperature ${temp.toFixed(1)}°C (+${devPct}% vs baseline), humidity ${hum.toFixed(1)}% (−${devPct}% vs baseline) — exceeds your ±20% threshold.`,
+    activity: "possible_fire",
+    activityAt: 0.5,
   },
   {
     inbound: "Notify me when the door is opened and an object is detected.",
     outboundKind: "alert",
     outboundText: () => "Door opened and an object was detected passing through.",
+    activity: "person_entered_room",
+    activityAt: 0.5,
   },
   {
     inbound:
@@ -1370,7 +1399,7 @@ const DEMO_SCENARIOS = [
 
 let demoTimerId = null;
 let demoCycleStart = 0;
-let demoRun = { cycle: -1, pos: -1, inboundFired: false, outboundFired: false, envBaseline: null };
+let demoRun = { cycle: -1, pos: -1, inboundFired: false, outboundFired: false, activityFired: false, envBaseline: null };
 let demoMessages = [];
 let demoMsgSeq = 0;
 
@@ -1602,19 +1631,25 @@ function demoTick() {
     // can skip straight over the in-window fire below without this.
     if (demoRun.pos >= 0) {
       const leaving = DEMO_TIMELINE[demoRun.pos];
-      if (leaving.type === "scenario" && demoRun.inboundFired && !demoRun.outboundFired) {
+      if (leaving.type === "scenario" && demoRun.inboundFired) {
         const leavingScenario = DEMO_SCENARIOS[leaving.index];
-        pushDemoMessage(
-          "outbound",
-          leavingScenario.outboundKind,
-          leavingScenario.outboundText(demoFinalResult(leaving.index)),
-        );
+        if (leavingScenario.activity && !demoRun.activityFired) {
+          pushDemoMessage("outbound", "alert", `UNO Q detected a possible activity: ${humanizeActivity(leavingScenario.activity)}.`);
+        }
+        if (!demoRun.outboundFired) {
+          pushDemoMessage(
+            "outbound",
+            leavingScenario.outboundKind,
+            leavingScenario.outboundText(demoFinalResult(leaving.index)),
+          );
+        }
       }
     }
     demoRun.cycle = cycle;
     demoRun.pos = phase.pos;
     demoRun.inboundFired = false;
     demoRun.outboundFired = false;
+    demoRun.activityFired = false;
     if (phase.type === "scenario" && phase.index === 0) demoRun.envBaseline = null;
   }
 
@@ -1636,6 +1671,14 @@ function demoTick() {
           ? demoDoorTick(phase.progress)
           : demoStorageTick(phase.progress);
 
+    // Fires first, ahead of the threshold-based outbound alert below: the
+    // board's own on-device model is a faster, cruder read of the same
+    // deviation, not the authoritative one -- see DEMO_SCENARIOS' comment.
+    if (scenario.activity && phase.progress >= scenario.activityAt && !demoRun.activityFired) {
+      pushDemoMessage("outbound", "alert", `UNO Q detected a possible activity: ${humanizeActivity(scenario.activity)}.`);
+      demoRun.activityFired = true;
+    }
+
     // 0.9, not 1.0: the common-case early fire, so the room has a moment to
     // read the alert before the scenario visibly ends. The transition
     // catch-all above is what actually guarantees it fires at all.
@@ -1656,12 +1699,13 @@ function updateDemoUI() {
   setAttr(els.demoToggle, "aria-pressed", String(demoMode));
   els.demoToggle.dataset.mode = demoMode ? "demo" : "live";
   setText(els.demoToggleLabel, demoMode ? "Demo" : "Live");
-  els.demoBadge.hidden = !demoMode;
-  // The header's connection dot is global, same as the badge: demo mode
-  // overrides it to an amber "Demo" so it can't be misread as the real feed
-  // being live, and stopping demo mode restores whatever the real SSE
-  // connection is actually doing right now, not just "live" by default.
-  if (demoMode) {
+  // Demo mode is a Live-system-tab presentation, so its badge and amber
+  // conn dot only show while that tab is the one on screen -- switching to
+  // any other tab reads as the real, plain-live system, even though the
+  // demo loop keeps running underneath so it can resume instantly.
+  const showDemo = demoMode && currentTab === "live";
+  els.demoBadge.hidden = !showDemo;
+  if (showDemo) {
     setAttr(els.conn, "data-state", "demo");
     setText(els.connLabel, "Demo");
   } else {
@@ -1677,7 +1721,7 @@ function startDemoMode() {
   // negative elapsedTotal for that first stretch and holds a calm resting
   // state instead of launching straight into scenario 1.
   demoCycleStart = Date.now() + DEMO_STARTUP_MS;
-  demoRun = { cycle: -1, pos: -1, inboundFired: false, outboundFired: false, envBaseline: null };
+  demoRun = { cycle: -1, pos: -1, inboundFired: false, outboundFired: false, activityFired: false, envBaseline: null };
   demoMessages = [];
   demoMsgSeq = 0;
   updateDemoUI();
@@ -1742,6 +1786,7 @@ const tabPanels = {
 
 function activateTab(name) {
   if (!tabPanels[name]) return;
+  currentTab = name;
   for (const btn of tabButtons) {
     const active = btn.dataset.tab === name;
     btn.setAttribute("aria-selected", String(active));
@@ -1766,6 +1811,11 @@ function activateTab(name) {
     startDemoMode();
     syncPhoneHeight();
   }
+  // Refresh the badge/conn-dot/status-pill scoping immediately -- otherwise a
+  // tab switch leaves the previous tab's state on screen until the next demo
+  // tick or SSE message happens to fire, which can be seconds away.
+  updateDemoUI();
+  if (latest) renderHeader(latest);
 }
 
 for (const btn of tabButtons) {

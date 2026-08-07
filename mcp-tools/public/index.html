@@ -216,11 +216,10 @@
             <header class="card-head"><h3><svg class="head-icon" aria-hidden="true"><use href="#i-unknown" /></svg>Disclosure</h3></header>
             <p>
               Network, storage and compute telemetry are <strong>simulated</strong>; the
-              environmental path is <strong>live</strong> from an Arduino UNO Q. The MCP adapters are
-              the seam to real DCIM/BMS/SNMP. The UNO Q's own activity inference is likewise
-              <strong>live</strong> — a real SmolLM2-135M model, running on the board's CPU, not
-              simulated or scripted — and is pushed to the on-call phone the same way an
-              environmental threshold crossing is, rather than sitting on a wall tile.
+              environmental path is <strong>live</strong> from an Arduino UNO Q, via MCP adapters
+              that generalize to real DCIM/BMS/SNMP. The UNO Q also runs its own <strong>live</strong>
+              activity inference (SmolLM2-135M, on-board Adreno 702 GPU) and pages the on-call phone the same
+              way as any threshold crossing.
             </p>
           </article>
         </div>
@@ -233,21 +232,21 @@
                 <svg class="team-icon" aria-hidden="true"><use href="#i-user" /></svg>
                 <div>
                   <p class="team-name">Indranil Acharya</p>
-                  <p class="team-org">Qualcomm</p>
+                  <p class="team-org">aryanil89@gmail.com</p>
                 </div>
               </article>
               <article class="card team-card">
                 <svg class="team-icon" aria-hidden="true"><use href="#i-user" /></svg>
                 <div>
                   <p class="team-name">John Koch</p>
-                  <p class="team-org">Qualcomm</p>
+                  <p class="team-org">ghostboarder193@gmail.com</p>
                 </div>
               </article>
               <article class="card team-card">
                 <svg class="team-icon" aria-hidden="true"><use href="#i-user" /></svg>
                 <div>
                   <p class="team-name">Christopher Gould</p>
-                  <p class="team-org">Qualcomm</p>
+                  <p class="team-org">chrisxgould@gmail.com</p>
                 </div>
               </article>
             </div>
@@ -287,18 +286,18 @@
                   <tr>
                     <td>On-device inference</td>
                     <td>
-                      A second, much smaller LLM (SmolLM2-135M) runs on the UNO Q itself, on CPU —
-                      correlating its own recent sensor history into short <code>activity-*</code> labels
-                      (e.g. a person entering the room, a possible fire-risk pattern). Live-verified on
-                      real hardware; the board's Adreno 702 GPU was tried and measured to lose to CPU for
-                      this workload
+                      A second, much smaller LLM (SmolLM2-135M) runs on the UNO Q itself, GPU-accelerated
+                      on the board's Adreno 702 — correlating its own recent sensor history into short
+                      <code>activity-*</code> labels (e.g. a person entering the room, a possible
+                      fire-risk pattern). Live-verified on real hardware
                     </td>
                     <td>—</td>
                   </tr>
                   <tr>
                     <td>Physical access</td>
                     <td>
-                      Presence (ToF, &lt;1000mm) → challenge → photo → automated identity match on
+                      Presence (ToF, &lt;1000mm) → challenge → photo, processed locally by an
+                      on-device model on the phone itself, then automated identity match on
                       CPU (face-cpu) resolves enrolled people. An unmatched face still goes to a
                       human — approve/deny on the phone or this wall — then the audit trail
                     </td>
@@ -308,8 +307,9 @@
                     <td>Phone's role</td>
                     <td>
                       Approval terminal + Telegram client + challenge notification (text only) +
-                      measured on-phone NPU benchmark + failover brain (GenieX down → the phone's
-                      8 Elite answers, labeled degraded — compute failover, not offline)
+                      on-device image processing as part of authentication + measured on-phone
+                      NPU benchmark + failover brain (GenieX down → the phone's 8 Elite answers,
+                      labeled degraded — compute failover, not offline)
                     </td>
                     <td>On-phone serving (persistent endpoint)</td>
                   </tr>
@@ -399,16 +399,16 @@
             </header>
             <p class="arch-does">
               Samples temperature, humidity, distance and button state, and pushes readings to the
-              laptop over WiFi + Tailscale every 10 seconds. Since 2026-08-06 it also runs a small
-              LLM of its own (SmolLM2-135M, CPU) to correlate that history into short
-              <code>activity-*</code> labels before the log ever leaves the board — see
+              laptop over WiFi + Tailscale every 10 seconds. Since 2026-08-06 it also runs
+              <span class="ai-tag">SmolLM2-135M, Adreno 702 GPU</span> to correlate that history
+              into short <code>activity-*</code> labels before the log ever leaves the board — see
               <code>docs/ONDEVICE_ACTIVITY.md</code>.
             </p>
             <h4 class="sub-head">Components on this device</h4>
             <ul class="arch-components">
               <li><span class="arch-comp-name">Modulino Thermo + Distance + Buttons</span> — temperature, humidity, presence, edge events</li>
               <li><span class="arch-comp-name">sketch.ino → main.py</span> — reads the bus, writes <code>sensor_log.jsonl</code></li>
-              <li><span class="arch-comp-name">activity.py</span> — SmolLM2-135M on CPU, correlates recent history into <code>activity-*</code> lines in the same log</li>
+              <li><span class="arch-comp-name">activity.py</span> — <span class="ai-tag">SmolLM2-135M, Adreno 702 GPU</span>, correlates recent history into <code>activity-*</code> lines in the same log</li>
               <li><span class="arch-comp-name">push_sensor_log.sh</span> — ships the log to the laptop every 10s</li>
             </ul>
             <dl class="kv">
@@ -422,13 +422,14 @@
               <span class="badge">reasoning</span>
             </header>
             <p class="arch-does">
-              Ingests the sensor log, runs the MCP tool servers, and feeds a local Qwen3-4B model on
-              the Hexagon NPU — then serves the wall display and the access terminal.
+              Ingests the sensor log, runs the MCP tool servers, and feeds
+              <span class="ai-tag">Qwen3-4B-Instruct-2507, Hexagon NPU</span> — then serves the
+              wall display and the access terminal.
             </p>
             <h4 class="sub-head">Components on this device</h4>
             <ul class="arch-components">
               <li><span class="arch-comp-name">MCP tool servers</span> — environmental (real), network / storage / compute (mocked)</li>
-              <li><span class="arch-comp-name">Hermes Agent + GenieX</span> — Qwen3-4B-Instruct-2507 on the Hexagon NPU</li>
+              <li><span class="arch-comp-name">Hermes Agent + GenieX</span> — <span class="ai-tag">Qwen3-4B-Instruct-2507, Hexagon NPU</span></li>
               <li><span class="arch-comp-name">Watchdog loop</span> — proactive paging every 15s</li>
             </ul>
             <dl class="kv">
@@ -444,12 +445,17 @@
             </header>
             <p class="arch-does">
               The on-call's notification client, and the one screen a human uses to approve or deny
-              physical access.
+              physical access. Its own Hexagon NPU now also runs
+              <span class="ai-tag">InsightFace buffalo_s</span> on the captured photo as part of
+              authentication, and stands in with <span class="ai-tag">Qwen3-4B-Instruct-2507</span>
+              when the laptop's GenieX is down.
             </p>
             <h4 class="sub-head">Components on this device</h4>
             <ul class="arch-components">
               <li><span class="arch-comp-name">Telegram app</span> — pages and reactive questions</li>
               <li><span class="arch-comp-name">phone.html</span> — access terminal: camera, approve/deny</li>
+              <li><span class="arch-comp-name">On-device face match</span> — <span class="ai-tag">InsightFace buffalo_s, Hexagon NPU</span>, processes the captured photo locally as part of authentication</li>
+              <li><span class="arch-comp-name">Failover LLM</span> — <span class="ai-tag">Qwen3-4B-Instruct-2507, Hexagon NPU</span>, answers one-shot when GenieX is down</li>
             </ul>
             <dl class="kv">
               <dt>Sends to</dt><dd>Laptop, approve/deny decisions</dd>
@@ -504,9 +510,10 @@
             <ul class="flow-items">
               <li>Thermo, distance and button edges, written to <code>sensor_log.jsonl</code> every 10s</li>
               <li>
-                A second, smaller correlation happens right here, on the board: SmolLM2-135M
-                (CPU) turns a run of recent events into an <code>activity-*</code> line — a
-                distinct tier from stage 4's laptop-side Qwen3-4B assessment below, not the same
+                A second, smaller correlation happens right here, on the board:
+                <span class="ai-tag">SmolLM2-135M, Adreno 702 GPU</span> turns a run of recent
+                events into an <code>activity-*</code> line — a distinct tier from stage 4's
+                laptop-side <span class="ai-tag">Qwen3-4B</span> assessment below, not the same
                 step twice
               </li>
             </ul>
@@ -535,7 +542,7 @@
             <p class="flow-step">4 · Correlate</p>
             <h3>State → verdict</h3>
             <ul class="flow-items">
-              <li>One scoring pass produces risk, confidence, likely cause and recommended action</li>
+              <li>One scoring pass — <span class="ai-tag">Qwen3-4B-Instruct-2507, Hexagon NPU</span> — produces risk, confidence, likely cause and recommended action</li>
             </ul>
             <p class="flow-out"><span>carries</span> an assessment every side of the system shares</p>
           </li>
@@ -583,6 +590,7 @@
             </header>
             <ol class="flow-chain">
               <li>Presence detected → a challenge is issued</li>
+              <li>Photo captured on the phone; <span class="ai-tag">InsightFace buffalo_s, Hexagon NPU</span> processes it there as part of authentication</li>
               <li>Approve/deny on the phone — tailnet, never Telegram</li>
               <li>Every decision is logged to an append-only audit trail</li>
             </ol>
@@ -827,14 +835,16 @@
           <article class="card">
             <header class="card-head">
               <h3><svg class="head-icon" aria-hidden="true"><use href="#i-temp" /></svg>Arduino UNO Q</h3>
-              <span class="badge">sensing</span>
+              <span class="badge">sensing + on-device AI</span>
             </header>
             <p class="arch-does">
               Samples temperature, humidity, ToF distance and button state over I2C, and pushes a
               periodic climate tick (~10s) plus edge-triggered button and presence events to the
               laptop over its WiFi + Tailscale link. It has no RTC battery, so every cold boot
               needs its clock set before its data is trusted. USB-C is used only to flash and
-              configure the board — it carries no sensor traffic.
+              configure the board — it carries no sensor traffic. Since 2026-08-06 it also runs
+              <span class="ai-tag">SmolLM2-135M, Adreno 702 GPU</span> to correlate recent history
+              into <code>activity-*</code> lines in the same log.
             </p>
             <h4 class="sub-head">Components on this device</h4>
             <ul class="arch-components">
@@ -843,6 +853,7 @@
               <li><span class="arch-comp-name">Modulino Buttons</span> — A / B / C, both-edge events</li>
               <li><span class="arch-comp-name">STM32 sketch.ino</span> — reads the bus, bridges to the Linux side</li>
               <li><span class="arch-comp-name">main.py</span> — App Lab container, writes <code>sensor_log.jsonl</code></li>
+              <li><span class="arch-comp-name">activity.py</span> — <span class="ai-tag">SmolLM2-135M, Adreno 702 GPU</span></li>
               <li><span class="arch-comp-name">push_sensor_log.sh</span> — scp's the log to the laptop over Tailscale every 10s</li>
             </ul>
             <dl class="kv">
@@ -860,9 +871,9 @@
             <p class="arch-does">
               Ingests the sensor log; runs four MCP tool servers (environmental is real, network /
               storage / compute are realistic mocks) that the Hermes Agent calls over stdio; sends
-              tool-augmented prompts to a local Qwen3-4B model served by GenieX on the Hexagon NPU;
-              runs a 15-second watchdog loop for proactive paging; and serves the wall display and
-              the access terminal, both from one Node process on port 7788.
+              tool-augmented prompts to <span class="ai-tag">Qwen3-4B-Instruct-2507, Hexagon NPU</span>
+              via GenieX; runs a 15-second watchdog loop for proactive paging; and serves the wall
+              display and the access terminal, both from one Node process on port 7788.
             </p>
             <h4 class="sub-head">Components on this device</h4>
             <ul class="arch-components">
@@ -870,7 +881,7 @@
               <li><span class="arch-comp-name">Hermes Agent</span> — MCP client, skills, memory, cron</li>
               <li><span class="arch-comp-name">Watchdog loop</span> — 15s tick, health on 127.0.0.1:7789</li>
               <li><span class="arch-comp-name">GenieX serve</span> — OpenAI-compatible endpoint, 127.0.0.1:18181</li>
-              <li><span class="arch-comp-name">Qwen3-4B-Instruct-2507</span> — GGUF Q4_0, 64K context</li>
+              <li><span class="arch-comp-name">Qwen3-4B-Instruct-2507</span> — <span class="ai-tag">GGUF Q4_0, Hexagon NPU, 64K context</span></li>
               <li><span class="arch-comp-name">Hexagon NPU v73</span> — CPU stays at 12–17% during inference</li>
               <li><span class="arch-comp-name">Wall + access terminal server</span> — 127.0.0.1:7788, SSE every 2s</li>
             </ul>
@@ -888,13 +899,17 @@
             <p class="arch-does">
               Runs the Telegram app as the on-call's notification and reactive-question client, and
               opens the laptop-served access terminal page to review and approve/deny physical
-              access — the only surface in the whole system a human writes to. Its own NPU is not
-              in use today.
+              access — the only surface in the whole system a human writes to. Its own Hexagon NPU
+              now also runs <span class="ai-tag">InsightFace buffalo_s</span> on the captured photo
+              as part of authentication, and stands in with
+              <span class="ai-tag">Qwen3-4B-Instruct-2507</span> when GenieX is down.
             </p>
             <h4 class="sub-head">Components on this device</h4>
             <ul class="arch-components">
               <li><span class="arch-comp-name">Telegram app</span> — receives pages, answers reactive questions</li>
               <li><span class="arch-comp-name">phone.html</span> — access terminal: camera capture, approve/deny, served from the laptop</li>
+              <li><span class="arch-comp-name">On-device face match</span> — <span class="ai-tag">InsightFace buffalo_s, Hexagon NPU</span>, processes the captured photo locally as part of authentication</li>
+              <li><span class="arch-comp-name">Failover LLM</span> — <span class="ai-tag">Qwen3-4B-Instruct-2507, Hexagon NPU</span>, one-shot via <code>genie-t2t-run</code> when GenieX is down</li>
             </ul>
             <dl class="kv">
               <dt>Receives</dt><dd>Telegram messages; the terminal page over the tailnet</dd>
@@ -934,6 +949,7 @@
             <ul class="flow-items">
               <li>I2C sample: thermo, ToF distance, button edges</li>
               <li><code>sketch.ino</code> → <code>main.py</code> appends <code>sensor_log.jsonl</code></li>
+              <li><code>activity.py</code> — <span class="ai-tag">SmolLM2-135M, Adreno 702 GPU</span> appends <code>activity-*</code> lines to the same log</li>
               <li>scp to the laptop over Tailscale, every 10s</li>
             </ul>
             <p class="flow-out"><span>carries</span> climate tick ~10s · edge events on change</p>
@@ -965,7 +981,7 @@
             <p class="flow-step">4 · Correlate</p>
             <h3>State → verdict</h3>
             <ul class="flow-items">
-              <li><code>assessIncident()</code> — the call behind <code>get_incident_assessment</code></li>
+              <li><code>assessIncident()</code> — the call behind <code>get_incident_assessment</code>, scored by <span class="ai-tag">Qwen3-4B-Instruct-2507, Hexagon NPU</span></li>
               <li>Risk index /100, confidence, evidence, likely cause, action</li>
               <li>One tick = one world seed, so no panel disagrees with another</li>
             </ul>
@@ -1025,6 +1041,7 @@
               <li><code>identify.ts</code> — detection only, so everyone reads <em>unknown</em></li>
               <li><code>decide.ts</code> → clear · expected · challenge · tailgating…</li>
               <li><code>notify.ts</code> pushes the challenge to the phone (text only)</li>
+              <li>The phone captures a photo and <span class="ai-tag">InsightFace buffalo_s, Hexagon NPU</span> processes it there as part of authentication</li>
               <li>Approve/deny on <code>phone.html</code> — tailnet, never Telegram</li>
               <li>Append-only audit entry in <code>.state/access.json</code></li>
             </ol>
@@ -1043,7 +1060,7 @@
               <li>Question typed on the phone → Telegram Bot API</li>
               <li><code>hermes gateway</code> long-polls it — sole consumer of the token</li>
               <li>Hermes Agent calls the MCP tools over stdio</li>
-              <li>GenieX → Qwen3-4B on the Hexagon NPU, 127.0.0.1:18181</li>
+              <li>GenieX → <span class="ai-tag">Qwen3-4B-Instruct-2507, Hexagon NPU</span>, 127.0.0.1:18181</li>
               <li>Reply back over Telegram to the phone</li>
               <li>The wall reads the transcript read-only and shows both sides</li>
             </ol>
