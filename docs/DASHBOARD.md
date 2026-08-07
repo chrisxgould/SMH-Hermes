@@ -45,7 +45,7 @@ table (usually the board clock, step 2 ⚠️).
 | `DASHBOARD_HOST` | `127.0.0.1` | Bind address. See the security note below |
 | `DASHBOARD_TICK_MS` | `2000` | Snapshot cadence, floored at 250ms |
 | `UNOQ_SENSOR_LOG` | repo-root `arduino_uno_q-sensor_log.json` | The sensor log to read |
-| `UNOQ_LOG_MAX_AGE_S` | `3600` | Older than this and the feed counts as down. Set it to `180` to match the demo config |
+| `UNOQ_LOG_MAX_AGE_S` | `180` | Older than this and the feed counts as down. Matches the gateway's `config.yaml` and the Scheduled Task payloads; the wall imports the constant from `environmental/file-source.ts` so the two cannot drift |
 | `ALERT_STATE_PATH` | `mcp-tools/.state/environmental-watch.json` | The watchdog state file the phone panel mirrors |
 | `WATCH_HEALTH_PORT` | `7789` | Where the wall probes for a live watchdog loop. `0` disables the probe |
 | `WATCH_HEALTH_CACHE_MS` | `5000` | How long a probe result is reused, so a 2s repaint is not a socket per tick |
@@ -98,7 +98,7 @@ while the wall still shows a live feed, and the two will contradict each other.
 | **Logical architecture** | What *moves* — the six stages from a bus read to a page on the phone, and the three branches that are allowed to act | Static |
 | **Live system** | The projector-scale summary — risk verdict, four channel tiles, network/storage/compute, and the phone thread, 60/40 split. Defaults into **demo mode** (below) the moment you navigate to it | Every 2s, or scripted in demo mode |
 | **Live details** | The full technical dashboard this used to be alone: sparklines, evidence, per-device feeders, the processing log. Always the real feed — demo mode never touches it | Every 2s |
-| **Detailed architecture** | Conceptual + logical, stacked on one scrolling panel, for a judge Q&A that wants both without flipping tabs | Static |
+| **Detailed architecture** | Conceptual + logical, stacked on one scrolling panel, for a Q&A that wants both without flipping tabs | Static |
 
 The four prose/summary tabs (Executive overview, Conceptual architecture,
 Logical architecture, Live system) are sized for a projector — read from the
@@ -143,8 +143,10 @@ touches the server, the sensor log, or any file `/api/stream` reads from.
   3. **Storage remediation** — "if available storage drops below 5%, clear
      log files and restart services, then tell me what happened"; the
      storage card drops to a simulated 3%, recovers to ~92% within the same
-     10s window, then an alert reports the drop, the remediation taken, and
-     the recovered figure.
+     10s window, then an alert reports the drop, the remediation it
+     recommends, and the recovered figure (the live agent is read-only by
+     design — it recommends and a human acts; the scripted demo copy says
+     the same).
   Only the active scenario's channel deviates — the other tiles hold a calm
   baseline throughout, so the tab never shows more than one thing happening
   at once. A one-time 10s quiet beat runs before scenario 1 the first time
@@ -205,7 +207,7 @@ Three things the card refuses to do:
   standing at the rack is not a resolved situation.
 - **One visit is one record.** The challenge stays open until presence ends, then
   files itself once. An earlier build retired it on approval, which freed the slot
-  and re-challenged the same person on the next tick — approving a judge and then
+  and re-challenged the same person on the next tick — approving a volunteer and then
   accusing them two seconds later.
 
 Identity comes from a swappable rung (`ACCESS_IDENTITY_METHOD`); the process default is
@@ -244,6 +246,13 @@ Three properties, in the order they matter:
    using it made *every* first alert an escalation and suppression never engaged
    at all. You know about the situation you walked into; you do not know about
    anything that got worse afterwards.
+
+   Such a page is annotated *"escalated while the on-call was on site — paging
+   anyway"*, **not** the property-1 wording above. Both sentences describe a hold
+   ending, and for a while both were the same sentence — so the one page meaning
+   "this deteriorated while you were standing next to it" read as routine
+   catch-up for a rack that had not changed. The two are now told apart by a
+   flag on the suppression decision, not by matching on its reason text.
 3. **Fail open.** Suppression depends on the *dashboard* being alive to write
    `access.json`. If the wall is down that file goes stale, and past
    `ACCESS_SUPPRESS_MAX_AGE_S` the watchdog pages regardless. A watchdog silenced
@@ -288,7 +297,7 @@ the page dims the trace, captions it "last logged trend · N old", and adds
 The wall reads the sensor log directly rather than going through the environmental MCP tool, so it
 applies the **same rounding at the same point** — `round1()` from `common/round.ts`, on the way in.
 Without that, the sparkline and the agent would quote the same sample to different precision, and a
-judge comparing the screen to the phone would find them disagreeing in the last digit.
+viewer comparing the screen to the phone would find them disagreeing in the last digit.
 
 Whole numbers stay whole in the data (`25`, not `25.0`); only alert *text* pads to a fixed decimal.
 Contract and rationale: [mcp-tools/README.md](../mcp-tools/README.md#one-decimal-place-applied-on-the-way-in).
@@ -311,15 +320,41 @@ The panel must never claim a delivery that has not happened. Three things can pu
 a message on it, and each bubble says which:
 
 1. **`watchdog · sent`** — the watchdog's state file changed, which only happens
-   when a tick actually decided to send. Evidence of a real delivery, observed
-   after the fact. A threshold alert bumps `lastAlertedAt`; a recovery clears it
-   and drops `lastStatus` to `ok`, so recovery is detected from the status
-   transition instead.
+   when a tick actually decided to send. A threshold alert bumps `lastAlertedAt`;
+   a recovery clears it and drops `lastStatus` to `ok`, so recovery is detected
+   from the status transition instead.
+
+   A changed state file is evidence of a **decision, not a delivery**.
+   `tick.ts` writes the state atomically *before* `watch-loop.ts` awaits the
+   Telegram send, and that send swallows its own failures — so if the wall
+   treated the state file as proof, every page would render delivered even with
+   the WiFi off, which is the exact beat the demo turns off the WiFi to show.
+   So a page enters the panel as recorded-but-unconfirmed (greyed, dashed,
+   tagged `not delivered`, text ending *"[sending — delivery not yet
+   confirmed]"*) and is promoted to a solid `watchdog · sent` bubble only when
+   the health endpoint's `lastMessageAt` advances past the moment the page was
+   recorded. That timestamp is written by `deliver()` *after* the Telegram call
+   returns, so it is the only positive delivery evidence observable from outside
+   the watchdog process.
+
+   When promotion cannot happen the bubble says which of the three reasons
+   applies rather than sitting silently grey: `lastDeliveryError` from the loop
+   is quoted verbatim (*"[not delivered: …]"*, and it keeps retrying since the
+   next send clears the error); a loop with `canDeliver: false` is terminal
+   (*"[not delivered: watchdog has no Telegram credentials]"*); and if nothing
+   answers the health port at all the wall admits the gap instead of inventing a
+   verdict (*"[recorded by the watchdog; delivery not confirmed — no watch loop
+   on the health port to report it]"*), because on the cron path there is no
+   process that reports send outcomes.
 2. **`queued · next tick ≤ 15s`** — running the *same* `decideAlert` the watchdog
    runs says an alert is due right now. The wall ticks every 2s, so it knows
    before the phone does. Rendered greyed, dashed and explicitly labelled. When
-   the watchdog then fires, that exact queued text is promoted to a delivered
-   bubble.
+   the watchdog then fires, that exact queued text is re-posted as a recorded
+   page and follows the promotion rule in (1) — it does not jump straight to a
+   delivered bubble. The queued prediction is the one bubble in the thread with
+   the fixed id `pending`; that is how the renderer tells "has not been sent
+   yet" apart from "was sent, not yet confirmed", since both are `delivered:
+   false`.
 
    The cadence in that tag is **measured, not assumed**: the server probes
    `http://127.0.0.1:7789/health` (cached 5s) and reports whatever interval the
@@ -402,7 +437,7 @@ delivered reply would put words on the wall the on-call never received.
 
 `node:sqlite` is Node 22.5+ and this package's floor is Node 20, so on an older
 runtime the bridge reports that on the panel instead of failing — as it does when
-there is no Hermes install at all, which is the normal case for a judge who just
+there is no Hermes install at all, which is the normal case for someone who just
 cloned the repo.
 
 Two alternatives, for a machine with no Hermes on it:
@@ -481,7 +516,7 @@ anything other than loopback; the three write routes then require it as
 `?secret=…` in the URL. The server prints a warning at startup if you bind to a
 network without one.
 
-It is opt-in and unset by default on purpose: a judge must be able to clone and
+It is opt-in and unset by default on purpose: anyone must be able to clone and
 run this from the README, and a mandatory secret turns that into a support ticket.
 It is also one lock on one door, not an auth system — say that rather than
 implying more.
@@ -493,6 +528,50 @@ else — on venue WiFi it would expose the sensor log, the file paths and the
 Telegram text to anyone on the network. The static file handler is containment-
 checked against `public/` and the ingest endpoint caps bodies at 16KB, but those
 are hygiene, not a security posture.
+
+### `tailscale serve` reaches a loopback bind — the startup warning cannot see it
+
+The phone reaches the terminal because `tailscale serve` publishes port 7788 on
+the tailnet and proxies to `127.0.0.1:7788`. Two consequences that the paragraph
+above does not cover on its own, both true of the demo configuration as shipped:
+
+- **The bind-address warning never fires.** It keys off `DASHBOARD_HOST`, which
+  is still loopback. Publishing over Tailscale reaches the same audience-widening
+  outcome by a route the check does not inspect, so *set `ACCESS_SHARED_SECRET`
+  whenever the wall is served over Tailscale too* — the autostart path does.
+- **Read paths are open to every tailnet device.** That follows directly from
+  "the read paths are a display", and it is the intended trade, but state it
+  plainly: anyone on the tailnet can read the sensor log, the roster names, file
+  paths and the Telegram text without a key. The tailnet is a handful of enrolled
+  devices rather than venue WiFi, which is why this is acceptable here and would
+  not be on a public network.
+- **Every request arrives as `127.0.0.1`.** The proxy is the client from the
+  server's point of view, so the server *cannot* distinguish the operator's own
+  browser from a tailnet visitor. Any future "only show this locally" idea is
+  therefore not implementable at this layer — which is exactly why the access key
+  is printed by a terminal script and not by an endpoint.
+
+### Recovering the phone link
+
+`scripts/show-phone-link.ps1` prints the ready-to-open phone URL (tailnet host
+included, key appended), copies it to the clipboard, and **verifies the key
+against the running dashboard** before telling you it is good. Run it when a
+phone has lost its link, when a new phone joins, or as a preflight check.
+
+The verification is the useful part. A phone holding a key from before the last
+restart shows a page that looks completely normal and fails only at the moment
+someone tries to capture — which during a live run reads as a broken camera, not
+a stale key. The script probes a **write** route (an empty `/api/access/capture`
+body, which cannot enrol or approve anything): `401` means the running server
+rejects the key, `400` means it accepts it. Probing a read route would certify
+any key at all, correct or not.
+
+```powershell
+scripts\show-phone-link.ps1                 # exit 0 = key verified, 2 = rejected
+```
+
+The URLs it prints contain the shared key, so it warns you not to put them on the
+projector. Anyone holding the key can approve or deny rack access.
 
 ## Layout
 

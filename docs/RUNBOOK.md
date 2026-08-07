@@ -49,7 +49,8 @@ units `active`; the health endpoint answering with `lastSource: "real"` and `fai
 double-pages the on-call); one `Loaded hook 'ack'` line per gateway start.
 
 The watchdog has its own page: **[WATCHDOG.md](WATCHDOG.md)** — cadence, health endpoint,
-cutover, and the measured latency budget.
+cutover, and the measured latency budget. Live path on the demo laptop (2026-08-07): the
+Scheduled-Task loop `SMH-Hermes-Watchdog`; the Hermes-cron variant is retired there.
 
 ### ⚠️ Never health-check GenieX over HTTP
 
@@ -92,13 +93,13 @@ the API call, resolved against `%USERPROFILE%\.cache\geniex\models\`. Hermes sen
 | Flag | Value | Why |
 |---|---|---|
 | `--nctx` | `65536` | **Must equal `context_length` in `config.yaml`.** Hermes builds prompts up to its declared context; if GenieX allocated less, the overflow lands on the server. |
-| `--compute` | `npu` | Offloads to Hexagon. Measured 12.1% mean CPU across 12 cores vs 56–74% on CPU fallback ([NPU_SPIKE_RESULTS.md](NPU_SPIKE_RESULTS.md)). Do **not** use `gpu` — faster prefill, but reproducibly fails tool-enabled requests. |
+| `--compute` | `npu` | Offloads to Hexagon. Measured 12–17% CPU during NPU generation vs 33%+ on the benchmarked Q4_0 CPU run and 56–74% under the Q4_K_M silent fallback ([NPU_SPIKE_RESULTS.md](NPU_SPIKE_RESULTS.md)). Do **not** use `gpu` — faster prefill, but reproducibly fails tool-enabled requests. |
 | `--keepalive` | `3600` | Default is **300** — the model unloads after 5 min idle. See below. |
 
 **Default `--nctx` is 4096**, nowhere near Hermes's 64K minimum. Omitting the flag does not
 give you a smaller working setup; it gives you a broken one.
 
-`--compute` unset auto-selects, and on this laptop it *did* pick NPU (measured 12.1% CPU).
+`--compute` unset auto-selects, and on this laptop it *did* pick NPU (measured 12–17% CPU).
 Set it anyway — auto-selection is not a contract.
 
 ### `--keepalive 300` is why the first reply is slow
@@ -461,6 +462,13 @@ suppression path silently degrades if the dashboard is not writing `access.json`
       WiFi) **with `ACCESS_SHARED_SECRET` set** — `demo-face-ON.ps1 -Secret <value>` does
       both — and the phone opens `…/phone.html?secret=<value>`. Off-loopback with no secret,
       enrol/approve are open to the venue network; the startup banner warns, listen to it.
+- [ ] **The phone's key is the one the server is running.**
+      `scripts\show-phone-link.ps1` — exit 0 and `[OK] the dashboard … accepts this key`. Then
+      re-open the link it prints on the phone, even if the phone looks fine. It will look fine:
+      the page reads the key only on a write, so a key from before the last restart shows a
+      green `live` dot and a correct verdict and fails **only** at capture, on stage, looking
+      like a broken camera. Every restart that mints a new secret arms this. Thirty seconds
+      here, or a dead beat in front of judges.
 - [ ] Gateway: `hermes gateway status` — running, telegram connected — and both hooks are
       loaded (`Select-String "Loaded hook" ...gateway-stdio.log`, §3): `ack`, then `failover`.
 - [ ] Failover phone (if the beat is scheduled): `adb devices` shows `device` — USB debugging
@@ -479,7 +487,7 @@ suppression path silently degrades if the dashboard is not writing `access.json`
       `demo-failover-ON.ps1` (disables the supervisor: a killed GenieX now STAYS dead), then
       `Get-Process geniex | Stop-Process -Force` (teardown takes a few seconds — re-check with
       `handler.py --probe`, expect DOWN/exit 2), then a real Telegram question. Expect the
-      canned receipt in ~2s, the 📱-labeled phone answer in ~15s on both the phone and the
+      canned receipt in ~2s, the 📱-labeled phone answer in ~12s on both the phone and the
       wall, then silence — the doomed gateway turn dies quietly, which is §3's documented
       behavior. `demo-failover-OFF.ps1` restores; the next completion pays the model reload.
 

@@ -296,13 +296,20 @@ Telegram panel:
    probed from the loop's health endpoint. If it reads *"queued · next watchdog tick"* with the
    **Watchdog process** row showing `no loop detected`, the loop is down — that is layer 7a
    failing, and the wall is telling you so rather than guessing.)
-2. When the real tick fires, that same bubble turns solid and marked *"watchdog · sent"* — with
-   **identical text** to what landed on the phone. Compare them character for character; both are
-   built from `src/alert-skill/summarize.ts`.
-3. On recovery, one *"recovered to OK"* bubble, same rules.
+2. When the real tick fires, the bubble is re-posted as a record of that page — still greyed and
+   dashed, now tagged *"not delivered"* with the text ending *"[sending — delivery not yet
+   confirmed]"*. This is the correct intermediate state, not a fault: the watchdog writes its state
+   file before it attempts the send.
+3. Within one tick it turns **solid** and marked *"watchdog · sent"* — with **identical text** to
+   what landed on the phone. Compare them character for character; both are built from
+   `src/alert-skill/summarize.ts`. If instead it stays greyed with a bracketed reason (*"[not
+   delivered: …]"*), the send genuinely failed and the reason is the loop's own error string —
+   that is the correct display, and the phone will have nothing.
+4. On recovery, one *"recovered to OK"* bubble, same rules.
 
-**If a bubble says `sent` and the phone has nothing**, the watchdog state file moved without a
-delivery — check `cron\jobs.json` `last_status`, not the wall.
+**If a bubble says `sent` and the phone has nothing**, the health endpoint's `lastMessageAt`
+advanced without the message arriving — that is a Telegram-side delivery gap, not a wall bug.
+Check `delivered`/`undelivered` on `http://127.0.0.1:7789/health`.
 
 ---
 
@@ -338,7 +345,7 @@ node $R\mcp-tools\dist\alert-skill\check-environmental.js
 | Enrolled person at the sensor, incident live | `NO_ALERT`, and `heldPage` appears in `.state\environmental-watch.json` |
 | Same, run again | `NO_ALERT`, and `heldPage.since` is **unchanged** |
 | They step away, run again | `ALERT …` ending **"(held while the on-call was on site; sending now)"** |
-| Status escalates while they stand there | `ALERT …` — escalation always wins |
+| Status escalates while they stand there | `ALERT …` ending **"(escalated while the on-call was on site — paging anyway)"** — escalation always wins, and must NOT read as the deferred-page wording above |
 | Dashboard stopped, so `access.json` goes stale | `ALERT …` — it fails open |
 
 **If it pages when it should hold**, check in this order: is the verdict actually `expected` on the
@@ -408,4 +415,4 @@ state reading `idle` with the roster populated.
 
 ⚠️ **An empty `enrolled` list means everyone will read as `unknown`** — the challenge loop still
 works, but the "known responder holds the page" beat cannot fire. Enrol before going on stage, and
-if you are enrolling a judge live, that *is* the beat — do it deliberately and say what it does.
+if you are enrolling a volunteer live, that *is* the beat — do it deliberately and say what it does.

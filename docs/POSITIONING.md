@@ -1,6 +1,6 @@
 # Positioning — the approved wording
 
-The exact sentences to use, so the README, the slides, the demo script and the judge answers all
+The exact sentences to use, so the README, the slides, the demo script and the Q&A answers all
 say the same thing. Copy from here; do not improvise on stage.
 
 Every claim below has been checked against the locked decisions in [../PROGRESS.md](../PROGRESS.md)
@@ -33,6 +33,26 @@ and [FEASIBILITY.md](FEASIBILITY.md) §Telegram. Nothing here overstates what is
 > those. Hermes does not collect the signals — it *judges* them.
 
 The distinction to hold on to: **the innovation is reasoning over signals, not collecting them.**
+
+### Where the model earns its keep
+
+If asked "isn't the LLM just a narration layer over deterministic plumbing?" — the honest answer
+is that the deterministic floor is a **safety property, not the absence of AI**, and the model
+does four jobs the plumbing cannot:
+
+1. **Tool orchestration** — for an open-ended question the agent decides which adapters to
+   consult and in what order; the one-call assessment exists as an optimization of that loop,
+   not a replacement for it.
+2. **Receipts and narrated diagnosis** — every verdict arrives as an explanation with evidence
+   attached, written by the model from live tool outputs, not filled into a template.
+3. **Live Q&A** — the on-call interrogates the incident in free text from the phone and gets
+   answers grounded in current tool state; no rule engine answers questions it wasn't shaped for.
+4. **A second, smaller intelligence at the edge** — the UNO Q's on-board SmolLM2 labels activity
+   patterns before they reach the laptop; the wall and Telegram surface its inferences.
+
+The risk/confidence arithmetic stays deterministic **on purpose**: numbers a reviewer can
+recompute are the part you want falsifiable. The model reasons; the arithmetic keeps the
+reasoning honest.
 
 ## 3. The offline claim — say it precisely
 
@@ -84,7 +104,7 @@ adapter, currently selected.
 ```
 Physical Signal Layer     Arduino UNO Q — temperature, water level (ToF), presence, door, buttons
 Telemetry Layer           Simulated storage / network / compute adapters
-MCP Tool Layer            Four stdio servers — the swappable seam to real systems
+MCP Tool Layer            Five stdio servers — the swappable seam to real systems
 Reasoning Layer           Hermes Agent + Qwen3-4B-Instruct-2507 on the Hexagon NPU via GenieX
 Decision Layer            Risk (severity index) + confidence (ordinal) + evidence + recommendation
 Authorization Layer       Access verdict + human approve/deny — LOCAL ONLY, never over the relay
@@ -94,7 +114,7 @@ Notification Layer        Messaging gateway — Telegram today, Slack/Teams in a
 The Authorization Layer sits **below** Notification on purpose. The relay may carry the question;
 it may never carry the answer.
 
-## 7. Judge Q&A — scripted answers
+## 7. Q&A — scripted answers
 
 **"Datacenters already have sensors. What is new?"**
 > Correct, and we do not claim otherwise. The sensors are not the contribution — the local reasoning
@@ -178,7 +198,7 @@ it may never carry the answer.
 > which is the license this project runs under.
 
 **"Why Arduino?"**
-> It is our physical rack simulator. Real datacenters have DCIM and BMS; we needed something a judge
+> It is our physical rack simulator. Real datacenters have DCIM and BMS; we needed something an audience
 > can interfere with in the room. It is also the only input in the system you can falsify by hand —
 > put your hand near the sensor and watch the reading move.
 

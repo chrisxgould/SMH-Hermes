@@ -1,6 +1,12 @@
 # Hermes: On-Device AI Operations Engineer
 Project Hermes — Snapdragon Multiverse Hackathon 2026
 
+<!-- keep the tests badge in sync with the npm test count -->
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-361%20passing-brightgreen)](mcp-tools/#status)
+[![Node](https://img.shields.io/badge/node-%E2%89%A5%2022-339933)](README.md#quickstart--three-rungs-pick-your-hardware)
+[![Inference](https://img.shields.io/badge/inference-Hexagon%20NPU%2C%20on--device-E62E2E)](docs/EVIDENCE.md)
+
 Hermes is an AI operations engineer that runs **entirely on a Snapdragon X Elite** — no cloud AI, no
 data leaving the laptop. It correlates real physical sensor signals with infrastructure telemetry to
 tell an on-call engineer what is wrong, why it matters, and what to do next.
@@ -16,6 +22,14 @@ the device, and you can prove it by cutting the WiFi mid-demo. The one internet 
 notification — a message relay, not intelligence, and a swappable adapter (Slack, Teams, Discord,
 WhatsApp and Signal are all supported by the same gateway; we demo on Telegram).
 
+And "the device" is now three devices: **inference runs on three Snapdragon tiers**. The
+laptop's X Elite Hexagon NPU serves the 4B agent; the Arduino UNO Q runs its own
+SmolLM2-135M **on the board**, pre-correlating raw sensor history into `activity-*` events
+before anything reaches the laptop (surfaced on the wall as "AI:" rows and folded into
+Telegram pages); and a Galaxy S25 Ultra's 8 Elite NPU stands by as the measured compute
+failover — GenieX dies, the phone answers in ~12 s, labeled degraded. Each tier is sized to
+its job; every number is measured ([docs/EVIDENCE.md](docs/EVIDENCE.md)).
+
 Built on [Hermes Agent](https://github.com/nousresearch/hermes-agent) + Qwen3-4B-Instruct-2507,
 NPU-accelerated via Qualcomm GenieX, with infrastructure exposed through MCP tool servers.
 
@@ -23,7 +37,7 @@ NPU-accelerated via Qualcomm GenieX, with infrastructure exposed through MCP too
 > **runs on** Nous Research's Hermes Agent runtime (MIT). It is not affiliated with, endorsed by, or
 > a product of Nous Research; their Hermes *model* family is not used here (the model is Qwen3).
 
-> **Judges: start at [docs/JUDGE_GUIDE.md](docs/JUDGE_GUIDE.md)** — the five-minute version:
+> **New here? Start at [docs/DEMO_GUIDE.md](docs/DEMO_GUIDE.md)** — the five-minute version:
 > demo sequence with expected outcomes, the real-vs-simulated table, every measured number,
 > and where each rubric category's evidence lives. This README is the long-form reference.
 
@@ -31,16 +45,24 @@ NPU-accelerated via Qualcomm GenieX, with infrastructure exposed through MCP too
 
 | Name | Email |
 |---|---|
-| Indranil Acharya | `aryanil89@gmail.com` |
+| Indranil Acharya (team lead) | `aryanil89@gmail.com` |
 | Christopher Gould | `chrisxgould@gmail.com` |
 | John Koch | `ghostboarder193@gmail.com` |
 
 
-> **Disclosure:** network, storage and compute telemetry are **simulated** with realistic data
-> patterns; the environmental path is **live** from an Arduino UNO Q. The MCP adapters are the seam —
-> the same tools can be pointed at real DCIM/BMS/SNMP without touching the reasoning layer. We
-> measured the simulator's own false-positive rate and recalibrated it — see
+> **Disclosure:** network and storage telemetry are **simulated** with realistic data patterns, as
+> is the six-node compute *rack*; the environmental path is **live** from an Arduino UNO Q, and one
+> compute node is live too — `host-01` in `get_compute_status` is this laptop's real CPU, memory and
+> uptime, read via Node's `os` and reported with its actual processor name (`Snapdragon(R) X Elite -
+> X1E80100`). **Every compute node carries a `source` field of `real` or `mock`**, because one
+> unlabelled real number sitting beside five invented ones is worse than no real number at all. The
+> MCP adapters are the seam — the same tools can be pointed at real DCIM/BMS/SNMP without touching
+> the reasoning layer. We measured the simulator's own false-positive rate and recalibrated it — see
 > [docs/REVIEW_3_2026-08-04.md](docs/REVIEW_3_2026-08-04.md) §2.
+>
+> `get_incident_assessment` deliberately scores the **simulated** fleet only: its risk number has to
+> be reproducible for a given seed, and a live CPU reading would make the same question return a
+> different score each time it is asked.
 >
 > **On identity:** automated identity match is live — `face-cpu` (InsightFace **buffalo_s**:
 > SCRFD-500MF detector + ArcFace MobileFaceNet recognizer, both ONNX, CPU-only via onnxruntime) —
@@ -60,7 +82,7 @@ NPU-accelerated via Qualcomm GenieX, with infrastructure exposed through MCP too
 
 ## Status
 **[PROGRESS.md](PROGRESS.md)** — the living done/next map. Read this first.
-**[docs/POSITIONING.md](docs/POSITIONING.md)** — the approved wording: pitch, offline claim, judge answers.
+**[docs/POSITIONING.md](docs/POSITIONING.md)** — the approved wording: pitch, offline claim, Q&A answers.
 **[SUBMISSION.md](SUBMISSION.md)** — every hackathon submission requirement, checked off or flagged.
 **[docs/EVIDENCE.md](docs/EVIDENCE.md)** — every measured claim with the measurement behind it.
 
@@ -77,8 +99,9 @@ claims score zero, so the line between them is part of the submission, not a foo
 | Phone's role | Approval terminal (`phone.html`) + Telegram client + **challenge notification pushed to Telegram** (text only, deliberately no photo; fire-and-forget, silent no-op when unconfigured) — **plus the failover brain** (built + verified live 2026-08-06): kill the laptop's GenieX and the phone's 8 Elite NPU answers the Telegram question over `adb`, labeled *📱 phone-NPU failover — degraded mode, no tools*. Compute failover, **not** an offline claim — Telegram still needs internet ([hermes-hooks/README.md](hermes-hooks/README.md)). The bench bundle is re-staged on the phone as a demo dependency (USB debugging on, Auto Blocker off through Friday); the phone stayed a working approval terminal throughout | On-phone **serving** on the 8 Elite — a persistent endpoint; today's failover is one-shot, no tools |
 | Alert suppression | **Wired and verified end to end**: an enrolled responder on site withholds the page; walking away releases it *("held while the on-call was on site; sending now")*; escalation or a stale access state pages regardless | — |
 | Energy | **Measured 2026-08-05** (HWiNFO system-rail integration, 60s idle baseline subtracted, same method as arXiv 2606.11257): NPU **471 J/query** at the real 12.5K-token agent shape (n=5); CPU burns **~8.7× more energy per prompt-token** (0.327 vs 0.0375 J) and lifts the system +21.3 W over idle vs the NPU's +6.3 W — [llm-serving-bench/RESULTS.md](llm-serving-bench/RESULTS.md#energy--joules-per-query-measured-2026-08-05-pm) | Same measurement on the **phone's** 8 Elite NPU, with error bars |
+| On-board activity inference | **SmolLM2-135M runs on the UNO Q itself** (CPU — the board's Adreno 702 GPU was found, measured and rejected: ~32× slower decode), correlating recent sensor history into `activity-*` log lines. A fresh line reaches the wall's device feed as an **"AI:" row** and is folded into the watchdog's Telegram page — built + verified 2026-08-06 ([docs/ONDEVICE_ACTIVITY.md](docs/ONDEVICE_ACTIVITY.md)) | Feeding `activity-*` lines into `get_incident_assessment` so the 4B tier reasons over the board's inferences — left unwired for the demo **on purpose** (a new assessment input two days out is churn risk; every detection already reaches the humans); level-based leak threshold demoted (Button C is the trigger) |
 
-## Judge quickstart — three rungs, pick your hardware
+## Quickstart — three rungs, pick your hardware
 
 The fastest path to seeing something real. Rung 1 needs any machine with Node 22+; the
 higher rungs need specific hardware. Every step says what "worked" looks like.
@@ -89,7 +112,7 @@ higher rungs need specific hardware. Every step says what "worked" looks like.
 cd mcp-tools
 npm install
 npm run build
-npm test                       # expect: Test Files 29 passed (29), Tests 327 passed (327)
+npm test                       # expect: Test Files 30 passed (30), Tests 361 passed (361)
 npm run start:dashboard        # then open http://127.0.0.1:7788
 ```
 
@@ -121,7 +144,7 @@ state machine.
 **Benchmark evidence:** [docs/EVIDENCE.md](docs/EVIDENCE.md) indexes every measured claim —
 NPU vs CPU throughput ([llm-serving-bench/RESULTS.md](llm-serving-bench/RESULTS.md)),
 joules-per-query, per-op Hexagon profiling ([docs/BENCHMARKS.md](docs/BENCHMARKS.md)).
-Test suite: **29 files / 327 tests, all passing** (verified 2026-08-06).
+Test suite: **30 files / 361 tests, all passing** (verified 2026-08-07).
 
 ## Run it yourself — the whole flow, in start order
 
@@ -134,7 +157,7 @@ and how to know it worked. The flow being started:
                                   [MCP tool servers: network/storage/compute = mock,
                                    environmental = real, assessment = the one-call verdict]
                                         ↑ log file
-                                  [2] Arduino UNO Q sensors → WiFi + Tailscale VPN
+                                  [2] Arduino UNO Q sensors + on-board activity LLM → WiFi + Tailscale VPN
                                   [5] watchdog loop (15s) → proactive Telegram alerts
                                   [6] wall display     → local browser (read-only)
                                   [7] access terminal  → the phone (the only thing that writes)
@@ -153,7 +176,7 @@ for anywhere else.
 | Need | Note |
 |---|---|
 | **Windows on ARM64** (Snapdragon X Elite / Copilot+) | The GenieX NPU path is win-arm64 only. An x64 machine can run everything *except* NPU inference |
-| **Node 22+** | For the MCP tool servers (`package.json` floor is 20, but the dashboard's `node:sqlite` needs 22.5+; verified on v24.18) |
+| **Node 22+** | For the MCP tool servers (`package.json` engines floor is 22; the dashboard's optional transcript bridge wants 22.5+ for `node:sqlite` and degrades gracefully below it; verified on v24.18) |
 | **`adb`** | Only for flashing/configuring the board (sketch + app deploy, initial WiFi/Tailscale setup, clock sync) — it carries no sensor traffic. Ships inside the scrcpy package: `winget install Genymobile.scrcpy` — this is not obvious |
 | **Telegram bot token** | From [@BotFather](https://t.me/BotFather); your numeric id from @userinfobot |
 | QAIRT SDK 2.32+ *(optional)* | Only to re-run the NPU profiling in `bench/` |
@@ -163,20 +186,33 @@ for anywhere else.
 
 ```powershell
 # 1. GenieX + the model. Q4_0 is load-bearing: Q4_K_M silently falls back to CPU.
-#    Installer → %LOCALAPPDATA%\GenieX CLI\geniex.exe
+#    Preview installer → %LOCALAPPDATA%\GenieX CLI\geniex.exe. Pin CLI v0.3.18 — the
+#    version every number in this repo was measured against. The preview channel moves
+#    weekly, and the phone/bench stack borrows its QAIRT 2.45 backend libs
+#    (PROGRESS.md), so upgrading breaks more than this README.
 & "$env:LOCALAPPDATA\GenieX CLI\geniex.exe" pull unsloth/Qwen3-4B-Instruct-2507-GGUF
 & "$env:LOCALAPPDATA\GenieX CLI\geniex.exe" ls          # expect the Q4_0 precision listed
 
 # 2. MCP tool servers
-cd mcp-tools; npm install; npm run build; npm test      # expect 327/327 passing
+cd mcp-tools; npm install; npm run build; npm test      # expect 361/361 passing
 cd ..
 
-# 3. Hermes Agent — native ARM64 installer → %LOCALAPPDATA%\hermes\  (this is HERMES_HOME;
-#    there is NO ~/.hermes on Windows). Then apply the non-streaming patch, see step 5.
-.\install.ps1                                            # from the hermes-agent release
+# 3. Hermes Agent — install.ps1 comes from the hermes-agent release page
+#    (https://github.com/NousResearch/hermes-agent, MIT), NOT from this repo. Native
+#    ARM64; wants Node 26 for itself (this repo's own floor stays Node 22) — that
+#    requirement landed 2026-08-02, so pin the release you installed rather than
+#    tracking latest. Lands in %LOCALAPPDATA%\hermes\  (this is HERMES_HOME; there is
+#    NO ~/.hermes on Windows.)
+.\install.ps1                                            # downloaded from the release above
 
-# 4. Secrets
-copy hermes.env.example "$env:LOCALAPPDATA\hermes\.env"  # then edit in your token + user id
+# 4. Secrets — the installer ships a stock .env at %LOCALAPPDATA%\hermes\.env full of
+#    commented cloud keys you should keep. APPEND the template (a plain copy would
+#    clobber that stock file), then edit in your token + user id:
+Get-Content hermes.env.example | Add-Content "$env:LOCALAPPDATA\hermes\.env"
+
+# 4b. The non-streaming patch — REQUIRED, or Hermes retries every completed reply
+#     forever (GenieX streams end without a finish frame). The diff is committed:
+.\hermes-hooks\patches\apply-nonstream.ps1               # idempotent; pairs with HERMES_FORCE_NONSTREAM=1 from the template
 ```
 
 **5. Wire Hermes to GenieX and register the tools** — edit `%LOCALAPPDATA%\hermes\config.yaml`.
@@ -205,13 +241,20 @@ mcp_servers:                              # absolute paths — see "Paths to cha
     env:
       UNOQ_SENSOR_LOG: "<REPO>\\arduino_uno_q-sensor_log.json"
       UNOQ_LOG_MAX_AGE_S: "180"           # older than this -> honest mock, not stale "real"
-      # UNOQ_LEAK_DISTANCE_MM: "150"      # water-level leak threshold; unset = level detection off
+      # UNOQ_LEAK_DISTANCE_MM: "150"      # water-level threshold - currently INERT (see uno-q/README); Button C is the leak trigger
   assessment:                             # get_incident_assessment - one call, one verdict
     command: node
     args: [ "<REPO>\\mcp-tools\\dist\\servers\\assessment-server.js" ]
     env:
       UNOQ_SENSOR_LOG: "<REPO>\\arduino_uno_q-sensor_log.json"
       UNOQ_LOG_MAX_AGE_S: "180"           # it reads the sensor path too - keep these in sync
+
+tools:
+  tool_search:
+    enabled: "off"                        # Qwen3-4B never completes the tool_search →
+                                          # tool_describe → tool_call discovery dance; with
+                                          # search on it answers from memory and calls no
+                                          # tools. "off" inlines the schemas (troubleshooting)
 ```
 
 ⚠️ **Register `assessment` — it is easy to miss and it is the one that matters on stage.** Each
@@ -243,6 +286,9 @@ hermes cron create --schedule "every 1m" --name "Environmental watch" `
 Shares the same tick code, but fires every ~2 minutes no matter what schedule it is given
 (measured 120s × 415 executions at `every 1m`). **Run one watchdog, not both** — both persist
 `.state/environmental-watch.json`, so two means every page arrives twice.
+
+*Status on the demo laptop (2026-08-07): the Scheduled-Task loop `SMH-Hermes-Watchdog` is the
+live alerting path; this cron variant is retired there and kept only as the documented fallback.*
 </details>
 
 **7. UNO Q app** — deploy `uno-q/hermes-sensor-logger/` to the board (see
@@ -250,13 +296,14 @@ Shares the same tick code, but fires every ~2 minutes no matter what schedule it
 
 #### Paths to change when moving machines
 
-Every absolute path lives in exactly four places — grep for `C:\Users\qc_de` to find them all:
+Every absolute path lives in exactly five places — grep for `C:\Users\qc_de` to find them all:
 
 | Where | What |
 |---|---|
 | `%LOCALAPPDATA%\hermes\config.yaml` | 5 × `mcp_servers` args + 2 × `UNOQ_SENSOR_LOG` |
 | `%LOCALAPPDATA%\hermes\scripts\environmental-watch.py` | `REPO_ROOT` (or set `SMH_HERMES_ROOT` instead of editing) |
 | `bench/bench.py` | `SDK`, `GX`, `BUNDLE` constants — only if profiling |
+| `llm-serving-bench/bench.py` + `run_cpu_energy.py` | `GENIEX` exe path, HWiNFO CSV path — only if re-running the serving bench |
 | `docs/` | Illustrative paths in prose; harmless if left |
 
 ### 1. Model server — GenieX on the Hexagon NPU
@@ -293,8 +340,9 @@ Why these flags:
 - **`--nctx 65536`** — Hermes hard-requires 64K. This **must equal `context_length` in
   `config.yaml`**: Hermes builds prompts up to its declared context, so if GenieX allocated
   less, the overflow lands on the server. (The default is 4096, nowhere near enough.)
-- **`--compute npu`** — offloads to Hexagon; measured **12.1% mean CPU** across 12 cores vs
-  56–74% on CPU fallback ([docs/NPU_SPIKE_RESULTS.md](docs/NPU_SPIKE_RESULTS.md)). Leaving it
+- **`--compute npu`** — offloads to Hexagon; measured **12–17% CPU** during NPU generation vs
+  **33%+** on the benchmarked Q4_0 CPU run and 56–74% under the Q4_K_M silent CPU fallback
+  ([docs/NPU_SPIKE_RESULTS.md](docs/NPU_SPIKE_RESULTS.md)). Leaving it
   unset auto-selects, and did pick NPU on this laptop — set it anyway, auto-selection is not a
   contract. Don't use `--compute gpu`: faster prefill, but reproducibly fails tool-enabled
   requests (GenieX preview bug).
@@ -314,7 +362,8 @@ Restart, recovery and health checks for every component: **[docs/RUNBOOK.md](doc
 
 The board app auto-starts on boot and writes one `sensor_tick` line (temperature + humidity) every
 10s to its local log, plus one line per button transition — both press *and* release — and one per
-ToF presence crossing. Getting that file **to the laptop** is WiFi + Tailscale, and nothing else:
+ToF presence crossing. Since 2026-08-06 the board's own SmolLM2-135M adds an `activity-*` line
+when it infers something from the recent history ([docs/ONDEVICE_ACTIVITY.md](docs/ONDEVICE_ACTIVITY.md)). Getting that file **to the laptop** is WiFi + Tailscale, and nothing else:
 nothing to start on the laptop — the board's `hermes-sensor-logger-push.service` scp-pushes every
 10s over the tailnet, *if* the board has WiFi and its Tailscale is authed (`tailscale status` on
 the board; re-auth after long offline periods).
@@ -343,7 +392,9 @@ display all quote the same number —
 [mcp-tools/README.md](mcp-tools/README.md#one-decimal-place-applied-on-the-way-in).
 
 **Worked when:** `arduino_uno_q-sensor_log.json` at the repo root gets a fresh `sensor_tick` line
-every ~10–20s. If you edited the board app, redeploy over USB:
+every ~10–20s. (The file is runtime output from the board's push pipeline — not tracked in git;
+it appears once the board pushes, and every reader degrades to labeled mock data until then.)
+If you edited the board app, redeploy over USB:
 ```powershell
 adb push uno-q\hermes-sensor-logger\sketch\sketch.ino /home/arduino/ArduinoApps/hermes-sensor-logger/sketch/sketch.ino
 adb push uno-q\hermes-sensor-logger\python\main.py /home/arduino/ArduinoApps/hermes-sensor-logger/python/main.py
@@ -358,8 +409,8 @@ adb shell "arduino-app-cli app restart user:hermes-sensor-logger"
 
 ### MCP tool servers — nothing to start
 
-Hermes spawns all four (`network`, `storage`, `compute` — realistic mocks — and `environmental` —
-real, reading the sensor log) automatically over stdio; they're registered in Hermes's
+Hermes spawns all five (`network`, `storage`, `compute` — realistic mocks — `environmental` —
+real, reading the sensor log — and `assessment`, the one-call verdict) automatically over stdio; they're registered in Hermes's
 `config.yaml` under `mcp_servers`. To smoke-test the environmental chain **without** the agent:
 
 ```powershell
@@ -382,8 +433,9 @@ hermes -z "check the rack-b1 to zone-east link"         # one-shot smoke test
 ```
 
 **Worked when:** the one-shot answers with tool-derived data (latency/packet-loss numbers from
-the network mock). Expect ~2–4 min per tool-calling turn (full-prompt re-prefill at ~280 tok/s on
-the NPU) — keep demo questions to one tool call each. This step is the **offline demo beat**: it
+the network mock). Expect ~2–4 min per tool-calling turn (every model call re-prefills the full prompt — measured
+382 tok/s at the bench shape, ~206 tok/s at the real 12.5K agent shape) — keep demo questions
+to one tool call each. This step is the **offline demo beat**: it
 works with WiFi off, because model, agent, and tools are all local.
 
 ### 4. The phone — Telegram gateway
@@ -424,7 +476,10 @@ with the estimate. Design, configuration and limits:
 
 A persistent process ticking every **15s** (`curl.exe -s http://127.0.0.1:7789/health` to confirm)
 with **zero LLM cost per tick**, pushing to Telegram only on a threshold crossing or recovery —
-silence is the normal state. To exercise it end to end:
+silence is the normal state. The pages carry the board's AI too: a fresh `activity-*` inference
+is appended to the alert text (*"UNO Q detected a possible activity: …"*), and deliberately does
+**not** pass through suppression — a responder at the rack is a reason to hold a threshold page,
+not to hold "someone just entered the room". To exercise it end to end:
 
 1. Press and **hold** button C on the UNO Q (press logs `leak_detected`; releasing logs
    `leak_cleared`, which cancels the alert rather than re-raising it). The water-level path is not
@@ -442,18 +497,23 @@ whole reason the loop exists — [docs/WATCHDOG.md](docs/WATCHDOG.md) has the fu
 while an incident is live (step 7), the page is **withheld** — you are looking at the thing it
 would have told you about. It is a deferral, not a cancellation: walk away and the alert arrives
 marked *"held while the on-call was on site; sending now."* Escalation while you stand there pages
-anyway, and if the wall isn't running the state goes stale and it pages regardless. So "no alert"
+anyway — and says so differently, *"escalated while the on-call was on site — paging anyway"*, so a
+rack that got worse under your nose is never mistaken for a deferred page arriving late. If the
+wall isn't running the state goes stale and it pages regardless. So "no alert"
 has two causes now — nothing wrong, or someone is on site. The wall says which.
 
 ### 6. The wall display — one page showing all of the above
 
 A local web page for the demo table: the UNO Q and its door / lighting / leak / temperature /
-humidity state on the left, the server ingesting that feed alongside the network, storage and
+humidity state on the left — its device feed labels the board's own SmolLM2 inferences as
+**"AI:" rows** — the server ingesting that feed alongside the network, storage and
 compute telemetry — and the inference it draws from them — in the middle, and the phone's Telegram
 thread on the right, **both directions** — pages the server sent on the left rail, questions the
 phone sent on the right. Three static tabs sit alongside the live one: the executive overview, the
 conceptual architecture (what the parts are) and the logical architecture (what moves, stage by
-stage).
+stage). Screenshots of every tab (captured 2026-08-06) live in
+[docs/evidence/wall/](docs/evidence/wall/) — dashboard UI shots, distinct from the benchmark
+captures indexed in [docs/EVIDENCE.md](docs/EVIDENCE.md).
 
 ```powershell
 cd mcp-tools
@@ -490,6 +550,12 @@ cd mcp-tools; npm run start:dashboard; cd ..    # ACCESS_IDENTITY_METHOD default
 ```
 
 Then open `http://100.x.y.z:7788/phone.html?secret=pick-something` on the phone.
+
+Lost the link, or a phone that used to work now says *Capture rejected*? Don't reconstruct it by
+hand — `scripts\show-phone-link.ps1` prints the URL with the key already appended,
+copies it to the clipboard, and **checks the key against the running server** before telling you
+it is good (exit 0 = accepted, 2 = rejected). A stale key is the failure worth naming: the page
+looks completely normal and only fails at the moment of capture, so it reads as a broken camera.
 
 What it does: someone approaches the rack, the ToF presence sensor (< 1000mm) opens a
 **challenge**, you photograph them with one tap, identity resolves down a pluggable ladder, and an
@@ -598,6 +664,9 @@ moment a decision lands) — the demo is human-supervised throughout.
 Get-Process geniex; Get-NetTCPConnection -LocalPort 18181 -State Listen  # [1] model server up
                                                                   #     (NOT curl -- it queues behind inference)
 Get-Item arduino_uno_q-sensor_log.json | % LastWriteTime          # [2] fresh = sensors flowing
+Select-String '"event": "activity"' arduino_uno_q-sensor_log.json |
+    Select-Object -Last 1                                         # [2b] board AI has inferred
+                                                                  #     (edge-triggered - may be old)
 node mcp-tools\dist\alert-skill\check-environmental.js --json     # [tools] source: real
 hermes -z "what's the temperature in rack B1?"                    # [3] agent + tools + NPU
 hermes gateway status                                             # [4] telegram connected
@@ -635,6 +704,7 @@ Every row here cost us real time; none are hypothetical.
 | **No alert arrived and nothing is wrong on the wall either** | An enrolled person is at the rack, so the page is being **held** on purpose (step 5 ⚠️) | Check the Access card — verdict `expected` means held, not broken. Walk away from the sensor and it fires |
 | The wall shows `expected` but the phone still paged | Correct: either the status **escalated** after they arrived, or the access state is older than `ACCESS_SUPPRESS_MAX_AGE_S` | Both are fail-open by design. If it is staleness, the dashboard (step 6) is not running — suppression needs it alive |
 | Phone gets **401** on Approve / Enrol | `ACCESS_SHARED_SECRET` is set on the server but missing from the phone's URL | Open `…/phone.html?secret=<the secret>` |
+| Phone page looks **completely normal**, then "Capture rejected" the moment you take a photo | The phone is holding a key from **before the last restart**. Nothing on the page reads the key until a write, so a stale one is invisible until then — it looks like a broken camera, not an auth failure | `scripts\show-phone-link.ps1` — it verifies the key against the running server and prints a fresh link. Exit 2 = the server rejects it |
 | Everyone reads as `unknown` no matter what | `ACCESS_IDENTITY_METHOD` is `stub` (the default and only claimed rung) — detection-only, by design. Nothing is broken | This is expected. The loop, matrix and audit trail all run the same way; a human decides from the photo either way |
 | Access card says *"presence unobservable"* | The sensor feed is stale, so the sentry froze rather than guess | Same fix as the `source: mock` row above. It is **not** filing false audit entries while in this state |
 | First reply of a session takes minutes, later ones are faster | `--keepalive` defaults to **300s**, so the model unloads after 5 min idle. The watchdog never calls the model, so nothing keeps it warm | `--keepalive 3600` (step 1), or send a throwaway message a minute before presenting |
@@ -661,12 +731,17 @@ Full end-to-end test procedure, layer by layer: **[docs/E2E_TEST.md](docs/E2E_TE
   *"recovered to OK"* of 2026-08-05 and the two defences against it, and the two staleness
   thresholds that look like a bug and are not
 - **Phone compute plan (2026-08-05, superseded)** — planned an on-phone Qwen3 NPU benchmark over
-  `adb` (no app) and a face-embedding identity rung on a Hexagon NPU. The on-phone LLM benchmark
-  remains **not built**, a stretch goal. The identity rung shipped instead as `face-cpu` — CPU
-  inference on the laptop, not the phone NPU this plan described — built and verified live
-  2026-08-06, see [phone/README.md](phone/README.md#the-identity-ladder). Its
-  challenge-notification item landed separately, in basic form: text to Telegram, no photo. The
-  built-vs-planned line lives in [Today vs. planned](#today-vs-planned)
+  `adb` (no app) and a face-embedding identity rung on a Hexagon NPU. Both halves have since
+  landed, each in a different shape than planned: the on-phone benchmark was **measured
+  2026-08-06** (prefill 1,918 ± 16.9 tok/s —
+  [RESULTS.md § Phone benchmark](llm-serving-bench/RESULTS.md#phone-benchmark-snapdragon-8-elite--2026-08-06))
+  and then wired in as the live **phone-NPU failover** (dead GenieX → the phone answers in
+  ~12 s, labeled degraded — [hermes-hooks/README.md](hermes-hooks/README.md)); the identity
+  rung shipped instead as `face-cpu` — CPU inference on the laptop, not the phone NPU this
+  plan described — built and verified live 2026-08-06, see
+  [phone/README.md](phone/README.md#the-identity-ladder). Its challenge-notification item
+  landed separately, in basic form: text to Telegram, no photo. The built-vs-planned line
+  lives in [Today vs. planned](#today-vs-planned)
 - **[The access terminal — the phone](phone/README.md)** — what the phone actually does: the
   authorisation surface, why the *notification* may be cloud but the *decision* may not, the
   four-rung identity ladder and which rungs work today, why capture uses `<input capture>`
@@ -721,7 +796,7 @@ Full end-to-end test procedure, layer by layer: **[docs/E2E_TEST.md](docs/E2E_TE
 
 ## Layout
 - `mcp-tools/` — MCP servers (TypeScript) wiring network/storage/compute (realistic mocks) and environmental/physical (**real**, via UNO Q sensors) datacenter health data into the agent, plus the edge-triggered alert logic behind the proactive watchdog loop (`src/alert-skill/watch-loop.ts`, see [docs/WATCHDOG.md](docs/WATCHDOG.md)), plus the local wall display (`src/dashboard/` + the dependency-free pages in `public/`, see [docs/DASHBOARD.md](docs/DASHBOARD.md)), plus the physical-access sentry (`src/access/` — decision matrix, identity ladder, roster of embeddings, append-only audit trail) and the bridge that lets a responder on site withhold a page (`src/alert-skill/suppress.ts`)
-- `uno-q/` — Arduino UNO Q app (`hermes-sensor-logger`: periodic climate `sensor_tick`, both-edge button events, and ToF presence crossings over three Bridge channels, plus the LED-matrix boot/connection display), pushed to the laptop over WiFi + Tailscale, and deployment/bring-up docs
+- `uno-q/` — Arduino UNO Q app (`hermes-sensor-logger`: periodic climate `sensor_tick`, both-edge button events, and ToF presence crossings over three Bridge channels, plus the on-board SmolLM2-135M activity loop writing `activity-*` inferences to the same log, plus the LED-matrix boot/connection display), pushed to the laptop over WiFi + Tailscale, and deployment/bring-up docs
 - `bench/` — NPU profiling harness (qnn-net-run against the W4A16 bundle); results in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)
 - `hermes-hooks/` — gateway hooks this project adds to Hermes (source of truth; the installed copy
   under `%LOCALAPPDATA%\hermes\hooks\` is not version-controlled and `hermes update` rewrites it).
@@ -734,5 +809,7 @@ Full end-to-end test procedure, layer by layer: **[docs/E2E_TEST.md](docs/E2E_TE
   stock file can stay untouched
 - `phone/` — Samsung Galaxy S25 Ultra (Snapdragon 8 Elite). **No app to build**: the phone runs
   Telegram plus the access terminal served from the laptop at `/phone.html` — the authorisation
-  surface, the rack camera, and roster enrolment. Its NPU is **not** in use yet; the on-phone
-  Qwen3-4B benchmark remains the stretch goal ([phone/README.md](phone/README.md#still-not-implemented))
+  surface, the rack camera, and roster enrolment. Its NPU is measured **and on call**: the
+  Qwen3-4B benchmark ran 2026-08-06 (prefill 1,918 ± 16.9 tok/s over `adb`) and now backs the
+  live phone-NPU failover — dead GenieX → the phone answers, labeled degraded
+  ([phone/README.md](phone/README.md), [hermes-hooks/README.md](hermes-hooks/README.md))

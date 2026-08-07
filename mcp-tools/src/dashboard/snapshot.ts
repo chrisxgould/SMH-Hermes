@@ -7,6 +7,7 @@ import { windowSeed } from "../common/rng.js";
 import { THERMAL_ZONE } from "../common/thermal.js";
 import { ENVIRONMENTAL_THRESHOLDS } from "../common/thresholds.js";
 import type { Status } from "../common/types.js";
+import { DEFAULT_MAX_AGE_S } from "../environmental/file-source.js";
 import { getEnvironmentalReading } from "../environmental/source.js";
 import { generateComputeReport } from "../mock/compute.js";
 import { generateNetworkReport } from "../mock/network.js";
@@ -119,7 +120,10 @@ export class SnapshotBuilder {
     // log older than UNOQ_LOG_MAX_AGE_S. Without applying the same gate here the
     // wall would animate a healthy feed while the tool was already falling back
     // to mock -- the two panels would contradict each other on stage.
-    const maxAgeSeconds = envNumber("UNOQ_LOG_MAX_AGE_S", 3600);
+    // Same default as the environmental tool, imported rather than repeated --
+    // a second copy of this number is how the wall came to call an hour-dead
+    // board "real" while the tool already considered it stale.
+    const maxAgeSeconds = envNumber("UNOQ_LOG_MAX_AGE_S", DEFAULT_MAX_AGE_S);
     const stale = log.ok && log.ageSeconds !== undefined && log.ageSeconds > maxAgeSeconds;
     const feedConnected = log.ok && !stale;
     const feedReason =
@@ -298,7 +302,7 @@ export class SnapshotBuilder {
         // line was written by the board's own on-device LLM correlating the
         // raw physical events, not read directly off a sensor, and not the
         // laptop's own risk assessment either. Kept as its own value (see
-        // PipelineEvent.source) so the wall can tell a judge which tier
+        // PipelineEvent.source) so the wall can tell the viewer which tier
         // produced which line.
         this.pushEvent({
           at: event.at,
