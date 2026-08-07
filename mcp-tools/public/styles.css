@@ -224,11 +224,10 @@ svg {
   background: color-mix(in srgb, var(--critical) 14%, var(--surface-2));
 }
 
-/* Global, not scoped to the Live system tab: demo mode overrides the same
-   summary elements Live Details would otherwise share, so anyone who
-   switches tabs mid-demo needs this visible regardless of which tab they
-   land on -- the entire point of a dedicated badge instead of folding the
-   state into the tab's own header. */
+/* Scoped to the Live system tab (see updateDemoUI in app.js): the demo loop
+   itself keeps running in the background on any tab, but the badge only
+   surfaces while Live system is the one on screen, so every other tab reads
+   as the real, plain-live system instead of carrying the demo caveat with it. */
 .demo-badge {
   display: inline-flex;
   align-items: center;
@@ -478,6 +477,18 @@ svg {
 .badge[data-tone="mock"] {
   color: var(--serious);
   border-color: color-mix(in srgb, var(--serious) 40%, transparent);
+}
+
+/* Inline highlight for "this is a real model running on-device" clauses in
+   architecture prose -- named per-model so a reader scanning the tab can
+   spot every place on-device AI is actually doing work, not just claimed. */
+.ai-tag {
+  display: inline-block;
+  font-weight: 700;
+  color: var(--accent-violet);
+  background: color-mix(in srgb, var(--accent-violet) 16%, transparent);
+  padding: 1px 8px;
+  border-radius: 5px;
 }
 
 .chip {
@@ -1934,10 +1945,10 @@ svg {
   width: 100%;
   max-width: 1880px;
   margin: 0 auto;
-  padding: 24px 32px 28px;
+  padding: 18px 32px 20px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 13px;
   /* Projector baseline: these four tabs are the ones presented to a room, read
      from the back row, not scrolled through on a laptop. Every size in this
      block is set for that distance first and legibility up close second. */
@@ -1964,8 +1975,13 @@ svg {
    arm's length and these are read from across the table. Scoped to `.brief` so
    the wall's own cards keep their tighter measurements. */
 .brief .card {
-  padding: 19px 21px;
+  padding: 13px 17px;
   border-width: 2px;
+}
+
+.brief-cards p {
+  font-size: 16.5px;
+  line-height: 1.38;
 }
 
 .brief .card-head {
@@ -2013,15 +2029,15 @@ svg {
 }
 
 .brief-title {
-  font-size: 46px;
+  font-size: 40px;
   font-weight: 700;
   letter-spacing: -0.01em;
   line-height: 1.12;
 }
 
 .brief-lede {
-  font-size: 21.5px;
-  line-height: 1.5;
+  font-size: 18.5px;
+  line-height: 1.4;
   color: var(--ink-2);
   max-width: 92ch;
 }
@@ -2047,7 +2063,12 @@ svg {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
   gap: 14px;
-  align-items: start;
+  align-items: stretch;
+}
+
+.brief-cards .card {
+  display: flex;
+  flex-direction: column;
 }
 
 .brief p {
@@ -2085,6 +2106,10 @@ svg {
   display: flex;
   align-items: center;
   gap: 14px;
+  /* Grid items default to min-width: auto, so without this the card's
+     min-content (driven by the unbreakable email string below) forces it
+     wider than the narrow team column and it spills into "What we built". */
+  min-width: 0;
 }
 
 .team-card > div {
@@ -2537,7 +2562,7 @@ svg {
 .brief-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 18px;
+  font-size: 15.5px;
   /* Fixed, with the widths declared below: left to itself at 1700px the middle
      column eats the row and the "planned" column ends up pinned to the far edge,
      which reads as two tables rather than a comparison. */
@@ -2547,9 +2572,9 @@ svg {
 .brief-table th,
 .brief-table td {
   text-align: left;
-  padding: 14px 18px;
+  padding: 7px 16px;
   border-bottom: 2px solid var(--hairline);
-  line-height: 1.4;
+  line-height: 1.32;
   vertical-align: top;
 }
 
@@ -2560,7 +2585,7 @@ svg {
 
 .brief-table th:last-child,
 .brief-table td:last-child {
-  width: 40%;
+  width: 26%;
 }
 
 .brief-table th {
@@ -2789,10 +2814,10 @@ svg {
   border: 2px solid var(--hairline);
   border-top: 5px solid var(--rule);
   border-radius: var(--radius);
-  padding: 17px 19px 18px;
+  padding: 12px 15px 13px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 /* The connector sits in the 22px column gap. Hidden on the last stage of each
@@ -2839,17 +2864,17 @@ svg {
 }
 
 .flow-stage h3 {
-  font-size: 20.5px;
+  font-size: 18px;
   font-weight: 600;
-  line-height: 1.22;
+  line-height: 1.2;
 }
 
 .flow-items {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  font-size: 16px;
-  line-height: 1.4;
+  gap: 4px;
+  font-size: 14.5px;
+  line-height: 1.34;
   color: var(--ink-2);
 }
 
@@ -2910,11 +2935,11 @@ svg {
 .flow-chain {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  margin: 11px 0 0;
+  gap: 5px;
+  margin: 9px 0 0;
   counter-reset: step;
-  font-size: 16px;
-  line-height: 1.4;
+  font-size: 14.5px;
+  line-height: 1.32;
   color: var(--ink-2);
 }
 
@@ -2941,11 +2966,11 @@ svg {
 }
 
 .flow-note {
-  margin-top: 12px;
-  padding-top: 11px;
+  margin-top: 9px;
+  padding-top: 8px;
   border-top: 2px solid var(--hairline);
-  font-size: 16px;
-  line-height: 1.45;
+  font-size: 14px;
+  line-height: 1.36;
   color: var(--ink-3);
 }
 
