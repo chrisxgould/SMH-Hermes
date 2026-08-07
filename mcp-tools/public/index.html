@@ -216,11 +216,10 @@
             <header class="card-head"><h3><svg class="head-icon" aria-hidden="true"><use href="#i-unknown" /></svg>Disclosure</h3></header>
             <p>
               Network, storage and compute telemetry are <strong>simulated</strong>; the
-              environmental path is <strong>live</strong> from an Arduino UNO Q. The MCP adapters are
-              the seam to real DCIM/BMS/SNMP. The UNO Q's own activity inference is likewise
-              <strong>live</strong> — a real SmolLM2-135M model, running on the board's CPU, not
-              simulated or scripted — and is pushed to the on-call phone the same way an
-              environmental threshold crossing is, rather than sitting on a wall tile.
+              environmental path is <strong>live</strong> from an Arduino UNO Q, via MCP adapters
+              that generalize to real DCIM/BMS/SNMP. The UNO Q also runs its own <strong>live</strong>
+              activity inference (SmolLM2-135M, on-board CPU) and pages the on-call phone the same
+              way as any threshold crossing.
             </p>
           </article>
         </div>
